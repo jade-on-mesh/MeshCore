@@ -217,6 +217,9 @@ public:
   bool hasIncompleteContactLoad() const;
   void loadChannels(DataStoreHost* host);
   bool saveChannels(DataStoreHost* host);
+  // MediaMesh: profile for Open TAK photo/voice traffic (tx.media).
+  uint8_t loadTxMedia();
+  bool saveTxMedia(uint8_t policy);
   bool migrateToSecondaryFS();
   uint8_t getBlobByKey(const uint8_t key[], int key_len, uint8_t dest_buf[]);
   bool putBlobByKey(const uint8_t key[], int key_len, const uint8_t src_buf[], uint8_t len);

@@ -189,6 +189,7 @@ static const uint32_t COMMAND_RADIO_APPLY_TIMEOUT_MS = 5000UL;
 #define CMD_GET_ALLOWED_REPEAT_FREQ   60
 #define CMD_SET_PATH_HASH_MODE        61
 #define CMD_SEND_CHANNEL_DATA         62
+#define DATA_TYPE_VOX_MEDIA           0x5643  // MeshCore Open TAK photo/voice packets ('VC')
 #define CMD_SET_DEFAULT_FLOOD_SCOPE   63
 #define CMD_GET_DEFAULT_FLOOD_SCOPE   64
 #define CMD_SEND_RAW_PACKET           65
@@ -3146,6 +3147,7 @@ void MyMesh::begin(bool has_display, bool radio_available,
   }
   // A saved table takes precedence over compiled defaults on later boots.
   _store->loadChannels(this);
+  _tx_media = _store->loadTxMedia();
   if (is_new_install) {
     // Make the first-boot defaults survive before a companion app changes them.
     _store->saveChannels(this);
@@ -3560,6 +3562,49 @@ bool MyMesh::handleCadCommand(const char* command, char* reply,
   return true;
 }
 
+bool MyMesh::handleTxMediaCommand(const char* command, char* reply, size_t reply_size) {
+  const bool is_get = !strcmp(command, "get tx.media");
+  const bool is_set = !strncmp(command, "set tx.media ", 13);
+  if (!is_get && !is_set) return false;
+  if (is_set) {
+    uint8_t policy;
+    if (!mesh::parseRadioTxPolicy(command + 13, policy)) {
+      snprintf(reply, reply_size, "Error: use set tx.media auto|radio|radio2|both|off");
+      return true;
+    }
+    if (policy != _tx_media) {
+      if (!_store->saveTxMedia(policy)) {
+        snprintf(reply, reply_size, "Error: tx.media was not saved");
+        return true;
+      }
+      _tx_media = policy;
+    }
+  }
+  const auto* profiles = _radio->profiles();
+  const bool radio2_tx = profiles && profiles->canTransmit(1);
+  snprintf(reply, reply_size, "%s%s%s", is_set ? "OK - tx.media " : "> ", mesh::radioTxPolicyName(_tx_media),
+      (_tx_media == mesh::RADIO_TX_SECONDARY || _tx_media == mesh::RADIO_TX_BOTH) && !radio2_tx
+          ? "; radio2 TX unavailable" : "");
+  return true;
+}
+
+bool MyMesh::sendMediaAwareGroupData(mesh::GroupChannel& channel, uint8_t* path, uint8_t path_len,
+                                     uint16_t data_type, const uint8_t* data, int data_len) {
+  if (data_type != DATA_TYPE_VOX_MEDIA || _tx_media == mesh::RADIO_TX_AUTO) {
+    return sendGroupData(channel, path, path_len, data_type, data, data_len);
+  }
+  if (data_len < 0 || data_len > MAX_GROUP_DATA_LENGTH) return false;
+  uint8_t temp[3 + MAX_GROUP_DATA_LENGTH];
+  temp[0] = (uint8_t)(data_type & 0xFF);
+  temp[1] = (uint8_t)(data_type >> 8);
+  temp[2] = (uint8_t)data_len;
+  if (data_len > 0) memcpy(&temp[3], data, data_len);
+  auto pkt = createGroupDatagram(PAYLOAD_TYPE_GRP_DATA, channel, temp, 3 + data_len);
+  if (pkt == NULL) return false;
+  pkt->tx_radio = _tx_media;   // overrides the channel's own choice
+  return path_len == OUT_PATH_UNKNOWN ? sendFloodScoped(channel, pkt) : sendDirect(pkt, path, path_len);
+}
+
 bool MyMesh::handleTxRoutingCommand(const char* command, char* reply, size_t reply_size) {
   const auto parsed = mesh::companion::parseTxRouteCommand(command);
   if (!parsed.matched) return false;
@@ -3687,6 +3732,7 @@ bool MyMesh::handleLocalControlCommand(const char* command, char* reply,
     return true;
   }
 
+  if (handleTxMediaCommand(command, reply, reply_size)) return true;
   if (handleTxRoutingCommand(command, reply, reply_size)) return true;
 #if MESH_ENABLE_MESHTEXT_CHAT
   if (handleMeshtextCommand(command, reply, reply_size)) return true;
@@ -6044,7 +6090,7 @@ void MyMesh::handleCmdFrame(size_t len) {
     } else if (payload_len > MAX_GROUP_DATA_LENGTH) {
       MESH_DEBUG_PRINTLN("CMD_SEND_CHANNEL_DATA payload too long: %d > %d", payload_len, MAX_GROUP_DATA_LENGTH);
       writeErrFrame(ERR_CODE_ILLEGAL_ARG);
-    } else if (sendGroupData(channel.channel, path, path_len, data_type, payload, payload_len)) {
+    } else if (sendMediaAwareGroupData(channel.channel, path, path_len, data_type, payload, payload_len)) {
       writeOKFrame();
     } else {
       writeErrFrame(ERR_CODE_TABLE_FULL);
@@ -6563,6 +6609,8 @@ void MyMesh::handleCmdFrame(size_t len) {
       } else {
         auto pkt = createRawData(&cmd_frame[i], len - i);
         if (pkt) {
+          // Client raw data is Open TAK photo/voice transfer traffic.
+          if (_tx_media != mesh::RADIO_TX_AUTO) pkt->tx_radio = _tx_media;
           sendDirect(pkt, path, path_len);
           writeOKFrame();
         } else {

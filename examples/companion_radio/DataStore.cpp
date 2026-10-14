@@ -2972,6 +2972,26 @@ void DataStore::loadChannels(DataStoreHost* host) {
 #endif
 }
 
+// MediaMesh tx.media: ['M'][encoded RadioTxPolicy]. Missing or unreadable
+// means auto, the routing every build had before this setting existed.
+uint8_t DataStore::loadTxMedia() {
+  File file = openRead(_fs, "/tx_media");
+  if (!file) return mesh::RADIO_TX_AUTO;
+  uint8_t bytes[2] = {0, 0};
+  const bool ok = file.read(bytes, sizeof(bytes)) == sizeof(bytes);
+  file.close();
+  return ok && bytes[0] == 'M' ? mesh::decodeRadioTxPolicy(bytes[1]) : mesh::RADIO_TX_AUTO;
+}
+
+bool DataStore::saveTxMedia(uint8_t policy) {
+  File file = openWrite(_fs, "/tx_media");
+  if (!file) return false;
+  const uint8_t bytes[2] = {'M', mesh::encodeRadioTxPolicy(policy)};
+  const bool ok = file.write(bytes, sizeof(bytes)) == sizeof(bytes);
+  file.close();
+  return ok;
+}
+
 bool DataStore::saveChannels(DataStoreHost* host) {
 #if defined(ESP32_PLATFORM)
   if (!promoteCompanionRecoveryFile(_getContactsChannelsFS(), "/channels2",

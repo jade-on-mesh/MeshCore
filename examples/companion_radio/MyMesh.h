@@ -333,6 +333,12 @@ public:
   void beginUsbLoggingReplyBarrier(BaseSerialInterface* route);
   void endUsbLoggingReplyBarrier(bool reply_queued);
   bool handleTxRoutingCommand(const char* command, char* reply, size_t reply_size);
+  // MediaMesh: MeshCore Open TAK photos and voice (raw data, channel data
+  // 0x5643 from a client) follow tx.media instead of contact/channel routing.
+  bool handleTxMediaCommand(const char* command, char* reply, size_t reply_size);
+  bool sendMediaAwareGroupData(mesh::GroupChannel& channel, uint8_t* path, uint8_t path_len,
+                               uint16_t data_type, const uint8_t* data, int data_len);
+  uint8_t _tx_media = mesh::RADIO_TX_AUTO;
 
   int  getRecentlyHeard(AdvertPath dest[], int max_num);
 

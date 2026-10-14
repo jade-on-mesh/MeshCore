@@ -241,6 +241,28 @@ its choice. They use reserved bytes in existing saved records, so record
 sizes and the phone protocol are unchanged. Older firmware ignores these
 bytes and may reset the choices when it saves the records.
 
+## Companion media routing (MediaMesh)
+
+MeshCore Open TAK sends photos and voice clips as client raw data
+(`CMD_SEND_RAW_DATA`) and as channel data type `0x5643`. `tx.media` routes that
+traffic to its own profile, so a second profile can serve as a media-only side
+channel while text stays on the primary:
+
+```text
+set radio2 916.0,250,7,5,rxtx
+set radio2.cross off
+set tx.media radio2
+get tx.media
+```
+
+Choices are `auto` (default: unchanged routing), `radio`, `radio2`, `both`
+and `off`, with the same meaning as `tx.user`. An explicit choice overrides the
+channel's or contact's own setting for this traffic only; other channel-data
+types, text, ACKs and adverts keep their normal routing. `radio2` still needs
+`rxtx` and never falls back to the primary profile. The choice is saved in
+`/tx_media` and survives reboot. Wadamesh uses the same command for the same
+purpose.
+
 ## Companion channel-name routing aliases
 
 Companions recognize the case-sensitive prefixes `r2-` and `mt-`, immediately
