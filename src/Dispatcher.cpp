@@ -525,6 +525,16 @@ uint32_t Dispatcher::getCADFailMaxDuration() const {
 void Dispatcher::logPacketLine(const char* direction, const Packet* packet,
                                int len, bool include_rx_metrics, float score,
                                uint32_t air_time) {
+  // A packet heard on (or sent on) the second radio profile, e.g. MediaMesh,
+  // is preceded by a profile line so log readers such as meshcoretomqtt can
+  // tell the two channels apart. Primary-profile packets print nothing extra,
+  // and readers that do not know the line skip it.
+  if (packet->radio_profile != 0) {
+    SerialLogLine<64> tag;
+    tag.printf("%s PROFILE: radio%u", getLogDateTime(),
+               (unsigned)packet->radio_profile + 1);
+    tag.flush(usbLoggingPort());
+  }
   SerialLogLine<256> line;
   line.printf("%s: %s, len=%d (type=%d, route=%s, payload_len=%d)",
               getLogDateTime(), direction, len, packet->getPayloadType(),
