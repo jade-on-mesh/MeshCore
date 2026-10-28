@@ -3451,11 +3451,11 @@ bool CommonCLI::handleEspNowDiagnosticCommand(uint32_t sender_timestamp,
     const char* page = command + 16;
     if (*page == 0) {
       _callbacks->formatEspNowStats("", reply, capacity);
-    } else if (strcmp(page, " rx") == 0 || strcmp(page, " tx") == 0
+    } else if (strcmp(page, " mac") == 0 || strcmp(page, " rx") == 0 || strcmp(page, " tx") == 0
                || strcmp(page, " drops") == 0 || strcmp(page, " test") == 0) {
       _callbacks->formatEspNowStats(page + 1, reply, capacity);
     } else {
-      mesh::cli::formatError(reply, capacity, "use get espnow.stats [rx|tx|drops|test]");
+      mesh::cli::formatError(reply, capacity, "use get espnow.stats [mac|rx|tx|drops|test]");
     }
     return true;
   }

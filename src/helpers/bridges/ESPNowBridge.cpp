@@ -919,7 +919,7 @@ void ESPNowBridge::formatStatus(char* reply, size_t reply_size) {
 void ESPNowBridge::formatStats(const char* page, char* reply, size_t reply_size) {
   const auto s = snapshotStats();
   if (page == nullptr || page[0] == 0) {
-    snprintf(reply, reply_size, "> rx=%lu mesh=%lu tx=%lu sent=%lu; pages: rx tx drops test",
+    snprintf(reply, reply_size, "> rx=%lu mesh=%lu tx=%lu sent=%lu; pages: mac rx tx drops test",
         (unsigned long)s.rx.frames, (unsigned long)s.rx.delivered,
         (unsigned long)s.tx.queued, (unsigned long)s.tx.callback_ok);
   } else if (strcmp(page, "mac") == 0) {
@@ -953,7 +953,7 @@ void ESPNowBridge::formatStats(const char* page, char* reply, size_t reply_size)
         (unsigned long)s.probe.rx_bad, (unsigned long)s.probe.last_tx_nonce,
         (unsigned long)s.probe.last_rx_nonce);
   } else {
-    snprintf(reply, reply_size, "Error: use get espnow.stats [rx|tx|drops|test]");
+    snprintf(reply, reply_size, "Error: use get espnow.stats [mac|rx|tx|drops|test]");
   }
 }
 
