@@ -22,6 +22,7 @@ HARNESS = r'''
 #include <string>
 #include <vector>
 #include <helpers/CompanionChannelAlias.h>
+#include <helpers/CLIReplyText.h>
 using std::isfinite;
 #define MESH_ENABLE_ONE_KEY_DM 1
 #define ONE_KEY_DM_SHARED_OFFLINE_QUEUE 0

@@ -502,6 +502,7 @@ int main() {
         harness = r'''
 #include <Arduino.h>
 #include <helpers/CompanionReader.h>
+#include <helpers/CLIReplyText.h>
 #include <cassert>
 #include <cstring>
 #include <string>
