@@ -9,7 +9,7 @@
 #ifdef WITH_ESPNOW_BRIDGE
 #include <WiFi.h>
 
-static void stopBridgeWiFiIfUnused() {
+static bool stopBridgeWiFiIfUnused() {
   if (!(mesh::wireless::control().enabled() & mesh::wireless::WiFi)) {
     // WebConfig/OTA may have adopted an initially IDF-only bridge driver.
     // Shut down through Arduino first so its private initialized/started
@@ -19,17 +19,32 @@ static void stopBridgeWiFiIfUnused() {
     // report OFF despite retaining initialized state. Complete that start
     // before stopping it, without allocating a facade for a pure IDF owner.
     if (WiFi.getMode() == WIFI_OFF && WiFi.channel() > 0) {
-      if (!WiFi.mode(WIFI_STA)) return;
+      if (!WiFi.mode(WIFI_STA)) return false;
     }
-    if (!WiFi.mode(WIFI_OFF)) return;
+    if (!WiFi.mode(WIFI_OFF)) return false;
 
     // Arduino OFF is a no-op when the bridge alone initialized the SDK.
     // Probe the SDK separately rather than trusting the facade's mode/cache.
     wifi_mode_t mode = WIFI_MODE_NULL;
-    if (esp_wifi_get_mode(&mode) == ESP_OK) {
-      esp_wifi_stop();
-      esp_wifi_deinit();
-    }
+    const esp_err_t state = esp_wifi_get_mode(&mode);
+    if (state == ESP_OK) {
+      if (esp_wifi_stop() != ESP_OK || esp_wifi_deinit() != ESP_OK) return false;
+    } else if (state != ESP_ERR_WIFI_NOT_INIT) return false;
+  }
+  return true;
+}
+
+static void stopBridgeWiFiAndReleaseSleepPreference(bool& owned, uint8_t previous,
+                                                    bool teardown_uncertain) {
+  // Keep both driver and cache intact while an old ESP-NOW session or a failed
+  // WiFi teardown may still be alive. A later stop retries before restoration.
+  if (teardown_uncertain || !stopBridgeWiFiIfUnused() || !owned) return;
+  owned = false;
+  // A new owner may use its own cached preference or a direct SDK policy.
+  // Never overwrite either while it owns WiFi, or a newer cached preference.
+  if (!(mesh::wireless::control().enabled() & mesh::wireless::WiFi)
+      && WiFi.getSleep() == WIFI_PS_NONE) {
+    (void)WiFi.setSleep(static_cast<wifi_ps_type_t>(previous));
   }
 }
 
@@ -84,9 +99,9 @@ void ESPNowBridge::begin() {
   BRIDGE_DEBUG_PRINTLN("Initializing...\n");
 
   if (_initialized) return;
-  if (_sdk_teardown_failed) {
+  if (_sdk_teardown_failed || _wifi_sleep_preference_owned) {
     end();
-    if (_sdk_teardown_failed) return;
+    if (_sdk_teardown_failed || _wifi_sleep_preference_owned) return;
   }
   if (!mesh::bridge::copyEspNowPeer(_active_peer)) {
     recordError(Stage::PeerConfig, ESP_ERR_INVALID_STATE);
@@ -151,11 +166,18 @@ void ESPNowBridge::begin() {
   auto failed = [this](esp_err_t result, Stage stage) {
     if (result == ESP_OK) return false;
     recordError(stage, result);
-    stopBridgeWiFiIfUnused();
+    stopBridgeWiFiAndReleaseSleepPreference(_wifi_sleep_preference_owned,
+        _previous_wifi_sleep, _sdk_teardown_failed);
     emitDebug();
     return true;
   };
   if (!shared_wifi) {
+    _previous_wifi_sleep = static_cast<uint8_t>(WiFi.getSleep());
+    _wifi_sleep_preference_owned = true;
+    // Arduino applies this cache asynchronously on STA_START, including after
+    // raw IDF startup. Prepare it first so a late event cannot undo SDK NONE.
+    // setSleep returns false when the cache is already correct.
+    (void)WiFi.setSleep(WIFI_PS_NONE);
     if (failed(esp_wifi_init(&wifi_config), Stage::WiFiInit)
         || failed(esp_wifi_set_storage(WIFI_STORAGE_RAM), Stage::WiFiStorage)
         || failed(esp_wifi_set_mode(WIFI_MODE_STA), Stage::WiFiMode)
@@ -175,7 +197,8 @@ void ESPNowBridge::begin() {
       recordError(Stage::WiFiProtocol, result);
       emitDebug();
       BRIDGE_DEBUG_PRINTLN("Error enabling ESP-NOW LR protocol\n");
-      stopBridgeWiFiIfUnused();
+      stopBridgeWiFiAndReleaseSleepPreference(_wifi_sleep_preference_owned,
+          _previous_wifi_sleep, _sdk_teardown_failed);
       return;
     }
   }
@@ -187,7 +210,8 @@ void ESPNowBridge::begin() {
     recordError(Stage::WiFiChannel, channel_result);
     emitDebug();
     BRIDGE_DEBUG_PRINTLN("Error setting WIFI channel to %d\n", _prefs->bridge_channel);
-    stopBridgeWiFiIfUnused();
+    stopBridgeWiFiAndReleaseSleepPreference(_wifi_sleep_preference_owned,
+        _previous_wifi_sleep, _sdk_teardown_failed);
     return;
   }
 
@@ -197,7 +221,8 @@ void ESPNowBridge::begin() {
     recordError(Stage::EspNowInit, init_result);
     emitDebug();
     BRIDGE_DEBUG_PRINTLN("Error initializing ESP-NOW\n");
-    stopBridgeWiFiIfUnused();
+    stopBridgeWiFiAndReleaseSleepPreference(_wifi_sleep_preference_owned,
+        _previous_wifi_sleep, _sdk_teardown_failed);
     return;
   }
 
@@ -212,8 +237,9 @@ void ESPNowBridge::begin() {
     BRIDGE_DEBUG_PRINTLN("Error registering ESP-NOW callbacks\n");
     esp_now_register_recv_cb(nullptr);
     esp_now_register_send_cb(nullptr);
-    esp_now_deinit();
-    stopBridgeWiFiIfUnused();
+    _sdk_teardown_failed = esp_now_deinit() != ESP_OK;
+    stopBridgeWiFiAndReleaseSleepPreference(_wifi_sleep_preference_owned,
+        _previous_wifi_sleep, _sdk_teardown_failed);
     return;
   }
 
@@ -233,8 +259,9 @@ void ESPNowBridge::begin() {
     BRIDGE_DEBUG_PRINTLN("Failed to add broadcast peer\n");
     esp_now_register_recv_cb(nullptr);
     esp_now_register_send_cb(nullptr);
-    esp_now_deinit();
-    stopBridgeWiFiIfUnused();
+    _sdk_teardown_failed = esp_now_deinit() != ESP_OK;
+    stopBridgeWiFiAndReleaseSleepPreference(_wifi_sleep_preference_owned,
+        _previous_wifi_sleep, _sdk_teardown_failed);
     return;
   }
 
@@ -258,8 +285,9 @@ void ESPNowBridge::begin() {
       esp_now_del_peer(peerInfo.peer_addr);
       esp_now_register_recv_cb(nullptr);
       esp_now_register_send_cb(nullptr);
-      esp_now_deinit();
-      stopBridgeWiFiIfUnused();
+      _sdk_teardown_failed = esp_now_deinit() != ESP_OK;
+      stopBridgeWiFiAndReleaseSleepPreference(_wifi_sleep_preference_owned,
+          _previous_wifi_sleep, _sdk_teardown_failed);
       return;
     }
   }
@@ -273,7 +301,12 @@ void ESPNowBridge::begin() {
 }
 
 void ESPNowBridge::end() {
-  if (!_initialized && !_sdk_teardown_failed) return;
+  if (!_initialized && !_sdk_teardown_failed) {
+    if (_wifi_sleep_preference_owned)
+      stopBridgeWiFiAndReleaseSleepPreference(_wifi_sleep_preference_owned,
+          _previous_wifi_sleep, false);
+    return;
+  }
   BRIDGE_DEBUG_PRINTLN("Stopping...\n");
 
   const esp_err_t remove_result = esp_now_del_peer(_active_peer);
@@ -297,7 +330,8 @@ void ESPNowBridge::end() {
   // Infrastructure WiFi may still own this shared radio.
   mesh::wifi::bridgeEspNowChannel().store(0);
   mesh::wifi::setLongRangeOwner(mesh::wifi::kLongRangeBridgeOwner, false);
-  stopBridgeWiFiIfUnused();
+  stopBridgeWiFiAndReleaseSleepPreference(_wifi_sleep_preference_owned,
+      _previous_wifi_sleep, _sdk_teardown_failed);
 
   portENTER_CRITICAL(&_rx_mux);
   _rx_head = 0;

@@ -100,8 +100,9 @@ compatible with older receivers. A failed unicast send is retried up to three
 times; MAC success confirms radio reception, not subsequent LoRa forwarding.
 The setting persists across reboot. `set espnow.peer broadcast` restores the
 default, which lets multiple bridges receive each packet without acknowledgements.
-Dedicated ESP-NOW operation disables WiFi modem sleep; an existing shared WiFi
-connection keeps its power policy.
+Dedicated ESP-NOW keeps the WiFi receiver awake to avoid missing bridge packets,
+using more power than modem sleep. When a WiFi service shares the driver, that
+service retains control of its sleep policy.
 
 ## What each bridge option does
 

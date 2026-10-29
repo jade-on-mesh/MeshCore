@@ -125,6 +125,8 @@ private:
   uint32_t _tx_dropped_reported;
   uint32_t _tx_started_at = 0, _tx_retry_at = 0;
   bool _sdk_teardown_failed = false;
+  uint8_t _previous_wifi_sleep = 0;
+  bool _wifi_sleep_preference_owned = false;
   static constexpr uint32_t TX_CALLBACK_TIMEOUT_MS = 1000;
   static constexpr uint32_t TX_RETRY_DELAY_MS = 20;
   static constexpr uint8_t TX_MAX_START_RETRIES = 3;

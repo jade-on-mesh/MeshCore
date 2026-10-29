@@ -19,6 +19,7 @@ public:
  int _tx_callback_status=0,_tx_dropped=0,_tx_dropped_reported=0;
  uint32_t _tx_started_at=0,_tx_retry_at=0;
  bool _sdk_teardown_failed=false;
+ uint8_t _previous_wifi_sleep=0;bool _wifi_sleep_preference_owned=false;
  mesh::bridge::diag::Stats _stats;
  std::atomic<bool> _debug_dirty{false};
  mesh::espnow::ESPNowRawReassembler _raw_reassembler;
@@ -178,7 +179,7 @@ def build_and_run(scenario, *, mutation=None, full=True):
     radio = (ROOT / 'src/helpers/esp32/ESPNOWRadio.cpp').read_text()
     radio = re.sub(r'^\s*#include.*$', '', radio, flags=re.MULTILINE)
     bridge_source = (ROOT / 'src/helpers/bridges/ESPNowBridge.cpp').read_text()
-    bridge = method(bridge_source, 'static void stopBridgeWiFiIfUnused(') + '\n'
+    bridge = method(bridge_source, 'static bool stopBridgeWiFiIfUnused(') + '\n' + method(bridge_source, 'static void stopBridgeWiFiAndReleaseSleepPreference(') + '\n'
     bridge += '\n'.join(method(bridge_source, f'void ESPNowBridge::{name}(')
                         .replace('ESPNowBridge::', 'Bridge::')
                         for name in ('begin', 'end', 'recordError', 'emitDebug'))

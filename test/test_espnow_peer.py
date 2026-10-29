@@ -186,6 +186,84 @@ int main(){
 '''
 
 
+ASYNC_SLEEP_CHECKS = r'''
+int main(){
+ Backend backend;mesh::wireless::control().begin(backend);
+ NodePrefs prefs;prefs.bridge_format=mesh::bridge::ESPNOW_FORMAT_WRAPPED;
+ mesh::PacketManager mgr;mesh::RTCClock rtc;
+ // Actual Arduino2.0.17 event behavior demonstrates why SDK-only NONE loses.
+ wifi_init_config_t cfg=WIFI_INIT_CONFIG_DEFAULT();
+ assert(esp_wifi_init(&cfg)==ESP_OK&&esp_wifi_set_mode(WIFI_MODE_STA)==ESP_OK&&esp_wifi_start()==ESP_OK);
+ assert(esp_wifi_set_ps(WIFI_PS_NONE)==ESP_OK&&wifi_ps==WIFI_PS_NONE);
+ deliverArduinoStaStart();assert(wifi_ps==WIFI_PS_MIN_MODEM);
+ assert(esp_wifi_stop()==ESP_OK&&esp_wifi_deinit()==ESP_OK);
+ for(unsigned cycle=0;cycle<3;++cycle){
+  ESPNowBridge bridge(&prefs,&mgr,&rtc);bridge.begin();
+  assert(bridge._initialized&&wifi_ps==WIFI_PS_NONE);
+  deliverArduinoStaStart();assert(wifi_ps==WIFI_PS_NONE&&WiFi.getSleep()==WIFI_PS_NONE);
+  bridge.begin();assert(bridge._previous_wifi_sleep==WIFI_PS_MIN_MODEM);
+  bridge.end();assert(!bridge._initialized&&!bridge._wifi_sleep_preference_owned&&WiFi.getSleep()==WIFI_PS_MIN_MODEM);
+ }
+ // An event delivered during SDK start also sees the prepared cache.
+ deliver_sta_during_start=true;
+ {ESPNowBridge bridge(&prefs,&mgr,&rtc);bridge.begin();assert(bridge._initialized&&wifi_ps==WIFI_PS_NONE);bridge.end();}
+ deliver_sta_during_start=false;
+ // setSleep returnsfalse for an already-correct preference; startup still works.
+ (void)WiFi.setSleep(WIFI_PS_NONE);assert(!WiFi.setSleep(WIFI_PS_NONE));
+ {ESPNowBridge bridge(&prefs,&mgr,&rtc);bridge.begin();assert(bridge._initialized);deliverArduinoStaStart();
+  assert(wifi_ps==WIFI_PS_NONE);bridge.end();assert(WiFi.getSleep()==WIFI_PS_NONE);}
+ (void)WiFi.setSleep(WIFI_PS_MIN_MODEM);
+ prefs.bridge_format=mesh::bridge::ESPNOW_FORMAT_RAW;
+ for(int stage:{11,12,13,14,15,19,2,4,7,8,9,10}){
+  failure=stage;ESPNowBridge bridge(&prefs,&mgr,&rtc);bridge.begin();
+  assert(!bridge._initialized&&!bridge._wifi_sleep_preference_owned&&WiFi.getSleep()==WIFI_PS_MIN_MODEM);
+  assert(!sdk_initialized&&!espnow_active);pending_sta_events=0;
+ }
+ failure=0;prefs.bridge_format=mesh::bridge::ESPNOW_FORMAT_WRAPPED;
+ // Shared startup never changes the owner's cache or actual modem policy.
+ assert(WiFi.mode(WIFI_STA));(void)WiFi.setSleep(WIFI_PS_MAX_MODEM);deliverArduinoStaStart();backend.wifi=true;
+ {ESPNowBridge bridge(&prefs,&mgr,&rtc);const auto writes=ps_writes;bridge.begin();
+  assert(bridge._initialized&&!bridge._wifi_sleep_preference_owned&&ps_writes==writes&&WiFi.getSleep()==WIFI_PS_MAX_MODEM);
+  bridge.end();assert(WiFi.getSleep()==WIFI_PS_MAX_MODEM&&wifi_ps==WIFI_PS_MAX_MODEM&&sdk_started);}
+ backend.wifi=false;assert(WiFi.mode(WIFI_OFF));(void)WiFi.setSleep(WIFI_PS_MIN_MODEM);
+ // An owner adopting a dedicated driver keeps its newer cached preference.
+ {ESPNowBridge bridge(&prefs,&mgr,&rtc);bridge.begin();assert(WiFi.mode(WIFI_STA));backend.wifi=true;
+  (void)WiFi.setSleep(WIFI_PS_MAX_MODEM);bridge.end();
+  assert(WiFi.getSleep()==WIFI_PS_MAX_MODEM&&wifi_ps==WIFI_PS_MAX_MODEM&&sdk_started&&!bridge._wifi_sleep_preference_owned);
+  deliverArduinoStaStart();assert(wifi_ps==WIFI_PS_MAX_MODEM);}
+ backend.wifi=false;assert(WiFi.mode(WIFI_OFF));(void)WiFi.setSleep(WIFI_PS_MIN_MODEM);
+ // Direct SDK writers do not alter the Arduino cache. Do not override an
+ // adopted owner's live setting at stop; its later event policy is its own.
+ {ESPNowBridge bridge(&prefs,&mgr,&rtc);bridge.begin();backend.wifi=true;
+  assert(esp_wifi_set_ps(WIFI_PS_MAX_MODEM)==ESP_OK);const auto writes=ps_writes;bridge.end();
+  assert(ps_writes==writes&&wifi_ps==WIFI_PS_MAX_MODEM&&WiFi.getSleep()==WIFI_PS_NONE);}
+ backend.wifi=false;stopBridgeWiFiIfUnused();(void)WiFi.setSleep(WIFI_PS_MIN_MODEM);
+ // A changed cached preference is retained even if its owner already left.
+ {ESPNowBridge bridge(&prefs,&mgr,&rtc);bridge.begin();(void)WiFi.setSleep(WIFI_PS_MAX_MODEM);bridge.end();
+  assert(WiFi.getSleep()==WIFI_PS_MAX_MODEM);}
+ (void)WiFi.setSleep(WIFI_PS_MIN_MODEM);
+ // WiFi facade/SDK stop or deinit failure cannot restore sleep prematurely.
+ for(int stage:{16,17}) {
+  ESPNowBridge bridge(&prefs,&mgr,&rtc);bridge.begin();assert(WiFi.mode(WIFI_STA));
+  failure=stage;bridge.end();
+  assert(!bridge._initialized&&bridge._wifi_sleep_preference_owned&&WiFi.getSleep()==WIFI_PS_NONE);
+  failure=0;bridge.end();
+  assert(!bridge._wifi_sleep_preference_owned&&WiFi.getSleep()==WIFI_PS_MIN_MODEM&&!sdk_initialized);
+ }
+ // A new begin retries failed cleanup without replacing the saved MIN intent.
+ {ESPNowBridge bridge(&prefs,&mgr,&rtc);bridge.begin();assert(WiFi.mode(WIFI_STA));
+  failure=17;bridge.end();assert(bridge._wifi_sleep_preference_owned);
+  failure=0;bridge.begin();assert(bridge._initialized&&bridge._previous_wifi_sleep==WIFI_PS_MIN_MODEM);
+  bridge.end();assert(WiFi.getSleep()==WIFI_PS_MIN_MODEM);}
+ // Failed ESP-NOW teardown keeps NONE until the uncertain SDK session ends.
+ {ESPNowBridge bridge(&prefs,&mgr,&rtc);bridge.begin();backend.wifi=true;failure=18;bridge.end();
+  assert(bridge._sdk_teardown_failed&&bridge._wifi_sleep_preference_owned&&WiFi.getSleep()==WIFI_PS_NONE);
+  failure=0;backend.wifi=false;bridge.end();
+  assert(!bridge._sdk_teardown_failed&&!bridge._wifi_sleep_preference_owned&&WiFi.getSleep()==WIFI_PS_MIN_MODEM&&!sdk_initialized);}
+}
+'''
+
+
 class EspNowPeerTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -249,6 +327,30 @@ namespace mesh {template<class FS> bool filePresence(FS* fs,const char* path,boo
                     "ESP_IDF_VERSION_MAJOR="+str(version//10000)])
                 result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=20)
                 self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+
+    def test_actual_arduino_delayed_start_sleep_cache_and_ownership(self):
+        from test_bridge_recovery import code, COMMON
+        with tempfile.TemporaryDirectory(prefix="espnow-async-sleep-") as tmp:
+            folder = Path(tmp)
+            source = folder / "test.cpp"
+            production = code()
+            original = production+COMMON+ASYNC_SLEEP_CHECKS
+            defines = ["ESP32=1", "WITH_ESPNOW_BRIDGE=1", "WITH_RS232_BRIDGE=1",
+                       "ESP_IDF_VERSION=40400", "ESP_IDF_VERSION_MAJOR=4"]
+            source.write_text(original)
+            binary = folder / "fixed"
+            self.compile(source, binary, [ROOT / "src"], defines)
+            result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=20)
+            self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+            # Mutation proves that a checked one-off SDK write still loses
+            # when the queued real Arduino STA_START branch runs afterward.
+            preparation = "(void)WiFi.setSleep(WIFI_PS_NONE);"
+            self.assertEqual(production.count(preparation), 1)
+            source.write_text(production.replace(preparation, "(void)0;")+COMMON+ASYNC_SLEEP_CHECKS)
+            mutant = folder / "sdk-only"
+            self.compile(source, mutant, [ROOT / "src"], defines)
+            result = subprocess.run([str(mutant)], capture_output=True, text=True, timeout=20)
+            self.assertNotEqual(result.returncode, 0, "SDK-only mutation unexpectedly survived late STA_START")
 
     def test_non_espnow_build_has_no_storage_or_peer_symbols(self):
         with tempfile.TemporaryDirectory(prefix="no-espnow-peer-") as tmp:
