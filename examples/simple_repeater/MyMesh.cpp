@@ -579,10 +579,6 @@ void MyMesh::putNeighbour(const mesh::Identity &id, uint32_t timestamp, float sn
   }
 
   // update neighbour info
-#if defined(WITH_MQTT_NEIGHBORS)
-  // A slot taken over by another identity forgets the old one's radio2.
-  if (!id.matches(neighbour->id)) neighbour->radio2 = Radio2DiscoverTrailer::unknown();
-#endif
   neighbour->id = id;
   neighbour->advert_timestamp = timestamp;
   neighbour->heard_timestamp = getRTCClock()->getCurrentTime();
@@ -3859,6 +3855,10 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
 
 #if MAX_NEIGHBOURS
   memset(neighbours, 0, sizeof(neighbours));
+#endif
+#if defined(WITH_MQTT_NEIGHBORS)
+  memset(radio2_cache, 0, sizeof(radio2_cache));   // all Unknown
+  radio2_cache_next = 0;
 #endif
 
   // defaults
@@ -14362,16 +14362,44 @@ bool MyMesh::handleNeighborDiscoverResponse(int overlay_idx,
 
 void MyMesh::noteNeighbourRadio2(const mesh::Identity& id,
                                  const Radio2DiscoverTrailer& radio2) {
-#if MAX_NEIGHBOURS
-  for (int i = 0; i < MAX_NEIGHBOURS; i++) {
-    if (id.matches(neighbours[i].id)) {
-      neighbours[i].radio2 = radio2;
-      return;
+  if (radio2.state == Radio2DiscoverTrailer::Unknown) return;  // no trailer: keep what we knew
+  int slot = -1, empty = -1, off = -1;
+  for (int i = 0; i < RADIO2_CACHE_SIZE; i++) {
+    const Radio2CacheEntry& e = radio2_cache[i];
+    if (e.radio2.state == Radio2DiscoverTrailer::Unknown) {
+      if (empty < 0) empty = i;
+    } else if (memcmp(e.prefix, id.pub_key, sizeof(e.prefix)) == 0) {
+      slot = i;
+      break;
+    } else if (e.radio2.state == Radio2DiscoverTrailer::Off && off < 0) {
+      off = i;
     }
   }
-#else
-  (void)id; (void)radio2;
-#endif
+  if (slot < 0) slot = empty;
+  if (slot < 0 && radio2.state == Radio2DiscoverTrailer::On) {
+    // A full cache keeps MediaMesh nodes: an On report replaces an Off one,
+    // else the oldest slot in turn. An Off report is dropped.
+    if (off >= 0) {
+      slot = off;
+    } else {
+      slot = radio2_cache_next;
+      radio2_cache_next = (uint8_t)((radio2_cache_next + 1) % RADIO2_CACHE_SIZE);
+    }
+  }
+  if (slot < 0) return;
+  memcpy(radio2_cache[slot].prefix, id.pub_key, sizeof(radio2_cache[slot].prefix));
+  radio2_cache[slot].radio2 = radio2;
+}
+
+Radio2DiscoverTrailer MyMesh::neighbourRadio2(const mesh::Identity& id) const {
+  for (int i = 0; i < RADIO2_CACHE_SIZE; i++) {
+    const Radio2CacheEntry& e = radio2_cache[i];
+    if (e.radio2.state != Radio2DiscoverTrailer::Unknown
+        && memcmp(e.prefix, id.pub_key, sizeof(e.prefix)) == 0) {
+      return e.radio2;
+    }
+  }
+  return Radio2DiscoverTrailer::unknown();
 }
 
 const MQTTRadio2Info* MyMesh::selfRadio2(MQTTRadio2Info& out, char* radio, size_t radio_size) {
@@ -14713,7 +14741,7 @@ bool MyMesh::startNeighborDiscover(char* reply) {
       metadata.snr = source.snr;
       metadata.rssi = source.rssi;
       metadata.status = ND_UNSENT;
-      neighbor_discover_radio2[i] = source.radio2;
+      neighbor_discover_radio2[i] = neighbourRadio2(source.id);
     }
   }
 

@@ -196,6 +196,12 @@ int main() {
     ++requested; tag=uint32_t(requested); return admit ? &packet : nullptr;
   }
   void touchNeighbourHeard(const mesh::Identity&,uint32_t,float,int16_t) { ++touched; }
+  // The fixture keeps each neighbour's radio2 beside it; the repeater's
+  // real lookup (a small cache) is tested in test_radio2_neighbour_cache.py.
+  Radio2DiscoverTrailer neighbourRadio2(const mesh::Identity& id) const {
+    for (const auto& n : neighbours) if (!memcmp(n.id.pub_key,id.pub_key,32)) return n.radio2;
+    return Radio2DiscoverTrailer::unknown();
+  }
   const MQTTRadio2Info* selfRadio2(MQTTRadio2Info& out,char* radio,size_t size) {
     snprintf(radio,size,"910.525000,250.0,7,5");
     out.radio=radio; out.mode="rxtx"; out.temporary=false; return &out;

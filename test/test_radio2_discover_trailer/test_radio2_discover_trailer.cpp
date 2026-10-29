@@ -15,7 +15,7 @@ TEST(Radio2DiscoverTrailer, ParsesTheMediaMeshPreset) {
   EXPECT_STREQ("rxtx", t.modeName());
   EXPECT_FALSE(t.temporary);
   EXPECT_EQ(911150U, t.freq_khz);
-  EXPECT_EQ(250000U, t.bw_hz);
+  EXPECT_EQ(250000U, t.bwHz());
   EXPECT_EQ(7, t.sf);
   EXPECT_EQ(5, t.cr);
   char radio[48];
@@ -67,6 +67,11 @@ TEST(Radio2DiscoverTrailer, LaterVersionsMayAppend) {
   Radio2DiscoverTrailer t = Radio2DiscoverTrailer::parse(b, sizeof(b));
   EXPECT_EQ(Radio2DiscoverTrailer::On, t.state);
   EXPECT_EQ(911150U, t.freq_khz);
+}
+
+TEST(Radio2DiscoverTrailer, FitsInEightBytes) {
+  // One per cached neighbour and per discovery result on DRAM-tight builds.
+  EXPECT_EQ(8u, sizeof(Radio2DiscoverTrailer));
 }
 
 TEST(Radio2DiscoverTrailer, UnknownIsZero) {
