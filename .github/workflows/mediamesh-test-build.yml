@@ -23,7 +23,15 @@ jobs:
       - name: Setup Build Environment
         uses: ./.github/actions/setup-build-environment
       - name: Build ${{ matrix.target }}
-        run: /usr/bin/env bash build.sh build-firmware ${{ matrix.target }}
+        run: |
+          set -o pipefail
+          if ! /usr/bin/env bash build.sh build-firmware ${{ matrix.target }} 2>&1 | tee build.log; then
+            # Surface compiler errors as annotations (readable without the log).
+            grep -E "error:|Error |undefined reference|\*\*\*" build.log | head -40 | while IFS= read -r l; do
+              echo "::error::${l//%/%25}"
+            done
+            exit 1
+          fi
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
