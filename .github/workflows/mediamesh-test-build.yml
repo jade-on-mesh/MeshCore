@@ -30,7 +30,7 @@ jobs:
           set -o pipefail
           if ! /usr/bin/env bash build.sh build-firmware ${{ matrix.target }} 2>&1 | tee build.log; then
             # Surface compiler errors as annotations (readable without the log).
-            { grep -E "error:|Error |undefined reference|\*\*\*" build.log | head -30 || true; for f in out/build-logs/*.log; do grep -E "error|overflow|Error" "$f" | head -20 || true; tail -n 25 "$f"; done; } | while IFS= read -r l; do
+            { tail -n 40 build.log || true; for f in out/build-logs/*.log; do [ -f "$f" ] || continue; grep -E "error|overflow|Error" "$f" | head -20 || true; tail -n 25 "$f" || true; done; } | while IFS= read -r l; do
               echo "::error::${l//%/%25}"
             done
             exit 1
