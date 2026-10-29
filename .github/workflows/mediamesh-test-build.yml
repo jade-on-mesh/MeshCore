@@ -1,0 +1,31 @@
+# Test builds for the radio2 (MediaMesh) MQTT tagging branch, on Jade's fork
+# only: never part of the upstream PR. Builds the Station G2 observers (plus a
+# non-MQTT repeater as a compile check) and uploads them as artifacts.
+name: MediaMesh MQTT test build
+
+on:
+  push:
+    branches: [mediamesh-mqtt-test-build, mediamesh-base-test-build]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - Station_G2_repeater_observer_mqtt
+          - Station_G2_room_server_observer_mqtt
+          - Heltec_v3_repeater
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Build Environment
+        uses: ./.github/actions/setup-build-environment
+      - name: Build ${{ matrix.target }}
+        run: /usr/bin/env bash build.sh build-firmware ${{ matrix.target }}
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: out
