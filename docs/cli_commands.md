@@ -6545,7 +6545,14 @@ get espnow.stats rx
 get espnow.stats tx
 get espnow.stats drops
 get espnow.stats test
+get espnow.peer
 ```
+
+`set espnow.peer AA:BB:CC:DD:EE:FF` saves a fixed unicast destination and
+restarts an enabled bridge. Unicast uses MAC acknowledgements and up to three
+retries after an explicit failed send, with unchanged bridge packet bytes.
+`set espnow.peer broadcast` restores the default broadcast destination.
+Successful MAC delivery does not confirm subsequent LoRa forwarding.
 
 Status reports local state (`off`, `teardown-error`, `driver-error`,
 `channel-mismatch` or `ready`), then these compact fields:

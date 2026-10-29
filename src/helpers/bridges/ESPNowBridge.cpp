@@ -3,6 +3,7 @@
 
 #include <esp_wifi.h>
 #include <helpers/esp32/WiFiRadioPolicy.h>
+#include <helpers/ESPNowPeerSettings.h>
 #include <stdio.h>
 
 #ifdef WITH_ESPNOW_BRIDGE
@@ -87,6 +88,11 @@ void ESPNowBridge::begin() {
     end();
     if (_sdk_teardown_failed) return;
   }
+  if (!mesh::bridge::copyEspNowPeer(_active_peer)) {
+    recordError(Stage::PeerConfig, ESP_ERR_INVALID_STATE);
+    emitDebug();
+    return;
+  }
 
   _active_format = mesh::bridge::isValidEspNowFormat(_prefs->bridge_format)
       ? _prefs->bridge_format : mesh::bridge::ESPNOW_FORMAT_WRAPPED;
@@ -153,7 +159,10 @@ void ESPNowBridge::begin() {
     if (failed(esp_wifi_init(&wifi_config), Stage::WiFiInit)
         || failed(esp_wifi_set_storage(WIFI_STORAGE_RAM), Stage::WiFiStorage)
         || failed(esp_wifi_set_mode(WIFI_MODE_STA), Stage::WiFiMode)
-        || failed(esp_wifi_start(), Stage::WiFiStart)) return;
+        || failed(esp_wifi_start(), Stage::WiFiStart)
+        // A dedicated ESP-NOW receiver must listen continuously. Associated
+        // infrastructure WiFi retains its own saved modem-sleep policy.
+        || failed(esp_wifi_set_ps(WIFI_PS_NONE), Stage::WiFiPowerSave)) return;
   }
 
   if (raw_format) {
@@ -208,10 +217,11 @@ void ESPNowBridge::begin() {
     return;
   }
 
-  // Add broadcast peer
+  // A missing peer setting keeps legacy broadcast. Configured unicast uses
+  // the same bytes and gains MAC acknowledgement plus bounded callback retry.
   esp_now_peer_info_t peerInfo = {};
   memset(&peerInfo, 0, sizeof(peerInfo));
-  memset(peerInfo.peer_addr, 0xFF, ESP_NOW_ETH_ALEN); // Broadcast address
+  memcpy(peerInfo.peer_addr, _active_peer, sizeof(_active_peer));
   peerInfo.channel = _prefs->bridge_channel;
   peerInfo.ifidx = WIFI_IF_STA;
   peerInfo.encrypt = false;
@@ -266,12 +276,10 @@ void ESPNowBridge::end() {
   if (!_initialized && !_sdk_teardown_failed) return;
   BRIDGE_DEBUG_PRINTLN("Stopping...\n");
 
-  // Remove broadcast peer
-  uint8_t broadcastAddress[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
-  const esp_err_t remove_result = esp_now_del_peer(broadcastAddress);
+  const esp_err_t remove_result = esp_now_del_peer(_active_peer);
   if (remove_result != ESP_OK) {
     recordError(mesh::bridge::diag::Stage::PeerRemove, remove_result);
-    BRIDGE_DEBUG_PRINTLN("Error removing broadcast peer\n");
+    BRIDGE_DEBUG_PRINTLN("Error removing ESP-NOW peer\n");
   }
 
   // Unregister callbacks
@@ -514,10 +522,8 @@ void ESPNowBridge::pumpTransmitQueue() {
   }
   if (frame_len == 0) return;
 
-  static const uint8_t broadcast_address[] = {
-      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
   const esp_err_t result = esp_now_send(
-      broadcast_address, frame, frame_len);
+      _active_peer, frame, frame_len);
   if (result != ESP_OK) {
     recordError(mesh::bridge::diag::Stage::TxStart, result);
     portENTER_CRITICAL(&_tx_mux);

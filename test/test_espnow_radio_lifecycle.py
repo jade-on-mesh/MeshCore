@@ -24,6 +24,11 @@ using portMUX_TYPE=int;
 using esp_err_t=int;
 constexpr int ESP_OK=0,WIFI_IF_STA=0,WIFI_PROTOCOL_LR=8,WIFI_PHY_MODE_LR=1,WIFI_PHY_RATE_LORA_250K=2;
 enum wifi_mode_t {WIFI_OFF=0,WIFI_STA=1,WIFI_AP=2,WIFI_AP_STA=3};
+enum wifi_ps_type_t {WIFI_PS_NONE=0,WIFI_PS_MIN_MODEM=1};
+int esp_wifi_set_ps(wifi_ps_type_t){return 0;}
+namespace mesh {namespace bridge {
+bool copyEspNowPeer(uint8_t* address){memset(address,255,6);return true;}
+}}
 enum esp_now_send_status_t {ESP_NOW_SEND_SUCCESS=0,ESP_NOW_SEND_FAIL=1};
 struct esp_now_send_info_t {};
 struct esp_now_recv_info_t {const uint8_t* src_addr;};
@@ -232,6 +237,7 @@ public:
  struct Prefs {int bridge_format=mesh::bridge::ESPNOW_FORMAT_RAW;uint8_t bridge_channel=6;} prefs;
  Prefs* _prefs=&prefs;bool _initialized=false;
  int _active_format=0,_rx_mux=0,_rx_head=0,_rx_tail=0,_rx_count=0,_rx_dropped=0,_rx_dropped_reported=0;
+ uint8_t _active_peer[6]={255,255,255,255,255,255};
  int _tx_mux=0,_tx_head=0,_tx_tail=0,_tx_count=0,_tx_waiting=0,_tx_callback_done=0;
  int _tx_callback_status=0,_tx_dropped=0,_tx_dropped_reported=0;
  uint32_t _tx_started_at=0,_tx_retry_at=0;bool _sdk_teardown_failed=false;

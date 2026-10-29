@@ -29,6 +29,11 @@ constexpr int WIFI_PROTOCOL_11B=1,WIFI_PROTOCOL_11G=2,WIFI_PROTOCOL_11N=4,WIFI_P
 constexpr int WIFI_PHY_MODE_LR=1,WIFI_PHY_RATE_LORA_250K=2,WIFI_SCAN_RUNNING=-1;
 enum wl_status_t {WL_IDLE_STATUS,WL_CONNECTED,WL_NO_SSID_AVAIL,WL_CONNECT_FAILED,WL_DISCONNECTED};
 enum esp_now_send_status_t {ESP_NOW_SEND_SUCCESS=0,ESP_NOW_SEND_FAIL=1};
+enum wifi_ps_type_t {WIFI_PS_NONE=0,WIFI_PS_MIN_MODEM=1};
+int esp_wifi_set_ps(wifi_ps_type_t){return ESP_OK;}
+namespace mesh {namespace bridge {
+bool copyEspNowPeer(uint8_t* address){memset(address,255,6);return true;}
+}}
 struct esp_now_send_info_t {};
 struct esp_now_recv_info_t {const uint8_t* src_addr;};
 struct esp_now_peer_info_t {uint8_t peer_addr[6];int channel,ifidx;bool encrypt;};

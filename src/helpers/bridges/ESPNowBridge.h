@@ -135,6 +135,7 @@ private:
   // Snapshotted by begin() and immutable until end(), so callbacks and sends
   // never observe a partially applied preference change.
   uint8_t _active_format;
+  uint8_t _active_peer[6] = {255, 255, 255, 255, 255, 255};
   mesh::bridge::diag::Stats _stats;
   std::atomic<bool> _debug_dirty{true};
   uint32_t _debug_last_at = 0;

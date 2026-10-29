@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
+#include <array>
+#include <vector>
 #include <helpers/WirelessControl.h>
 #include <helpers/ESPNowRawFragmentation.h>
 #include <helpers/bridges/ESPNowBridgeFormat.h>
@@ -24,6 +26,7 @@ constexpr int ESP_OK=0, WIFI_STORAGE_RAM=0, WIFI_IF_STA=0, WIFI_SECOND_CHAN_NONE
 constexpr int WIFI_PROTOCOL_11B=1, WIFI_PROTOCOL_11G=2, WIFI_PROTOCOL_11N=4, WIFI_PROTOCOL_LR=8;
 constexpr int WIFI_PHY_MODE_LR=1, WIFI_PHY_RATE_LORA_250K=2;
 enum esp_now_send_status_t { ESP_NOW_SEND_SUCCESS=0, ESP_NOW_SEND_FAIL=1 };
+enum wifi_ps_type_t { WIFI_PS_NONE=0, WIFI_PS_MIN_MODEM=1 };
 struct esp_now_peer_info_t { uint8_t peer_addr[6]; int channel, ifidx; bool encrypt; };
 struct esp_now_rate_config_t { int phymode, rate; bool ersu, dcm; };
 
@@ -31,6 +34,22 @@ int failure=0, wifi_starts=0, wifi_stops=0, wifi_deinits=0, facade_initializatio
 bool sdk_initialized=false, sdk_started=false, espnow_active=false;
 uint8_t wifi_channel=6;
 wifi_mode_t sdk_mode=WIFI_OFF;
+wifi_ps_type_t wifi_ps=WIFI_PS_MIN_MODEM;
+unsigned ps_writes=0;
+int esp_wifi_set_ps(wifi_ps_type_t value) {
+  ++ps_writes;
+  if (!sdk_started || failure==19) return -1;
+  wifi_ps=value; return ESP_OK;
+}
+namespace mesh { namespace bridge {
+bool peer_settings_ready=true;
+uint8_t configured_peer[6]={255,255,255,255,255,255};
+bool copyEspNowPeer(uint8_t* out) {
+  if (!peer_settings_ready) return false;
+  memcpy(out,configured_peer,6); return true;
+}
+}}
+std::vector<std::array<uint8_t,6>> added_peers,removed_peers;
 int esp_wifi_init(wifi_init_config_t*) {
   if (sdk_initialized) return ESP_OK; // esp-idf init is idempotent.
   if (failure==11) return -1;
@@ -91,9 +110,14 @@ template<typename T> int esp_now_register_send_cb(T) { return failure==7 ? -1 : 
 template<typename T> int esp_now_register_recv_cb(T) { return failure==8 ? -1 : ESP_OK; }
 int esp_now_add_peer(esp_now_peer_info_t* peer) {
   assert(peer->channel==6);
+  std::array<uint8_t,6> address;memcpy(address.data(),peer->peer_addr,6);
+  added_peers.push_back(address);
   return failure==9 ? -1 : ESP_OK;
 }
-int esp_now_del_peer(const uint8_t*) { return ESP_OK; }
+int esp_now_del_peer(const uint8_t* peer) {
+  std::array<uint8_t,6> address;memcpy(address.data(),peer,6);
+  removed_peers.push_back(address);return ESP_OK;
+}
 int esp_now_set_peer_rate_config(const uint8_t*, esp_now_rate_config_t*) { return failure==10 ? -1 : ESP_OK; }
 int esp_wifi_config_espnow_rate(int, int) { return failure==10 ? -1 : ESP_OK; }
 
@@ -165,6 +189,7 @@ public:
   Prefs* _prefs=&prefs;
   bool _initialized=false;
   int _active_format=0, _rx_mux=0, _rx_head=0, _rx_tail=0, _rx_count=0, _rx_dropped=0, _rx_dropped_reported=0;
+  uint8_t _active_peer[6]={255,255,255,255,255,255};
   int _tx_mux=0, _tx_head=0, _tx_tail=0, _tx_count=0, _tx_waiting=0, _tx_callback_done=0;
   int _tx_callback_status=0, _tx_dropped=0, _tx_dropped_reported=0;
   mesh::espnow::ESPNowRawReassembler _raw_reassembler;
@@ -207,7 +232,7 @@ int main() {
     assert(facade_initializations==0);
   }
   // Every driver startup failure releases pure-IDF resources without a facade.
-  for (int stage : {11,12,13,14,15,2,4,7,8,9,10}) {
+  for (int stage : {11,12,13,14,15,19,2,4,7,8,9,10}) {
     failure=stage;
     bridge.begin();
     assert(!bridge._initialized);
