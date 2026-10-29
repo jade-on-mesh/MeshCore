@@ -3174,6 +3174,16 @@ void MyMesh::begin(bool has_display, bool radio_available,
 #endif
       true  // All Companion transports show startup unless the saved mode forbids it.
   );
+#ifdef MESHCORE_HAS_REAL_DISPLAY
+  // A saved identity makes later boots ordinary even if display preferences
+  // were never changed. RAM-only recovery must not look like a new install.
+#if defined(NRF52_PLATFORM)
+  mesh::ui::displayPowerPrefs().first_install_boot =
+      !identity_loaded && !_store->isVolatilePrimaryFS();
+#else
+  mesh::ui::displayPowerPrefs().first_install_boot = !identity_loaded;
+#endif
+#endif
 
 #if COMPANION_FEATURE_NOTIFICATIONS
   auto& notification_settings = _notifications.settings();

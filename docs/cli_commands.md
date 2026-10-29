@@ -1455,7 +1455,17 @@ position, automatic mode keeps normal colors. The small integer approximation
 uses UTC and longitude, so it needs neither a time zone nor daylight-saving
 configuration. Screen brightness and screen-off timers still work normally.
 
-All display-equipped Companion builds show the screen at boot in the default
+On a new installation, display-equipped Companions, repeaters, room servers
+and sensors keep the normal UI visible for two minutes after it is ready.
+This applies only when a missing identity was created and saved to persistent
+storage. Firmware updates and later boots with an existing identity use the
+normal screen timings below, even if display settings were never saved.
+The setup window does not change saved timeouts; an app connection or USB
+power change does not restart or shorten it. Explicit `off` and manual screen
+dismissal still apply. Button input can extend the screen using its normal
+timeout.
+
+On later boots, all display-equipped Companion builds show the screen in the default
 `button` or `button-pairing` mode, on battery or USB power. It stays on for the
 selected profile's timeout (15 minutes on e-paper, 15 seconds elsewhere).
 Button input restarts that timer. This also applies to previously saved button modes. Saved `off` and

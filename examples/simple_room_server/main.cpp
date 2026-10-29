@@ -299,6 +299,13 @@ void setup() {
 #endif
 
 #ifdef DISPLAY_CLASS
+#if defined(NRF52_PLATFORM)
+  mesh::ui::displayPowerPrefs().first_install_boot =
+      identity_load == IdentityLoadResult::Missing && !volatile_primary_fs;
+#else
+  mesh::ui::displayPowerPrefs().first_install_boot =
+      identity_load == IdentityLoadResult::Missing;
+#endif
 #if defined(HELTEC_V4_DISPLAY_UNIFIED) && HELTEC_V4_DISPLAY_UNIFIED
   // Initialize the UI dependency even when auto detection found no screen.
   // A later saved display.type change can enable it without restarting.
