@@ -28,9 +28,9 @@ jobs:
       - name: Build ${{ matrix.target }}
         run: |
           set -o pipefail
-          if ! /usr/bin/env bash build.sh build-firmware ${{ matrix.target }} 2>&1 | tee build.log; then
+          if ! /usr/bin/env bash build.sh build-firmware ${{ matrix.target }} 2>&1 | tee "$RUNNER_TEMP/build.log"; then
             # Surface compiler errors as annotations (readable without the log).
-            { grep -n -iE "error|fail|exceed|overflow|budget|too large|region .* overflowed" build.log out/build-logs/*.log 2>/dev/null | grep -v "^.*Compiling" | cut -c1-400 | tail -n 9 || true; } | while IFS= read -r l; do
+            { grep -n -iE "error|fail|exceed|overflow|budget|too large|region .* overflowed" "$RUNNER_TEMP/build.log" out/build-logs/*.log 2>/dev/null | grep -v "^.*Compiling" | cut -c1-400 | tail -n 9 || true; } | while IFS= read -r l; do
               echo "::error::${l//%/%25}"
             done
             exit 1
