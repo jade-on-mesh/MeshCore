@@ -12,20 +12,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 STORAGE_CHECKS = r'''
 #include <cassert>
-#include <cstdarg>
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include <helpers/CLICommandUtils.h>
 #include "ESPNowPeerSettings.h"
 #include "settings_under_test.cpp"
-
-namespace mesh {namespace cli {
-void formatError(char* out,size_t capacity,const char* format,...) {
-  snprintf(out,capacity,"Error: ");
-  const size_t used=strlen(out);va_list args;va_start(args,format);
-  vsnprintf(out+used,capacity-used,format,args);va_end(args);
-}
-}}
 struct NodePrefs {bool bridge_enabled=true,espnow_bridge_enabled=true;};
 struct Callbacks {
   unsigned restarts=0,stops=0;bool restart_ok=true;

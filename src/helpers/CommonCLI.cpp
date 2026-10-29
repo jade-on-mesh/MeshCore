@@ -3466,8 +3466,8 @@ bool CommonCLI::handleEspNowPeerCommand(const char* command, char* reply) {
       !memcmp(previous, destination, sizeof(previous));
   if (!mesh::bridge::saveEspNowPeer(destination)) {
     if (!mesh::bridge::espNowPeerSettingsHealthy()) _callbacks->setEspNowBridgeState(false);
-    mesh::cli::formatError(reply, capacity, "ESP-NOW peer not saved%s",
-        mesh::bridge::espNowPeerSettingsHealthy() ? "" : "; bridge blocked until reload");
+    mesh::cli::formatError(reply, capacity, mesh::bridge::espNowPeerSettingsHealthy()
+        ? "ESP-NOW peer not saved" : "ESP-NOW peer not saved; bridge blocked until reload");
     return true;
   }
   const bool enabled =
