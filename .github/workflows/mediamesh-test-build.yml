@@ -18,6 +18,9 @@ jobs:
           - Station_G2_repeater_observer_mqtt
           - Station_G2_room_server_observer_mqtt
           - Heltec_v3_repeater
+          - Station_G3_ESP32_repeater_observer_mqtt
+          - Station_G3_ESP32_r2_repeater_observer_mqtt
+          - ikoka_stick_nrf_30dbm_repeater
     steps:
       - uses: actions/checkout@v4
       - name: Setup Build Environment
