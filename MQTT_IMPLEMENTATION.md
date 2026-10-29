@@ -1016,6 +1016,18 @@ transmission, and only the radio2 copy is tagged.
 trailer (older firmware, or no answer this cycle). `self.radio2` is left out
 while this node's radio2 is off.
 
+**USB packet log (serial observers, e.g. nRF52 with meshcoretomqtt):** a packet
+on radio2 gets a line of its own right before its `RX`/`TX` line:
+```
+12:34:56 - 29/10/2026 U RADIO: radio2
+12:34:56 - 29/10/2026 U: RX, len=64 (type=4, route=F, payload_len=48) SNR=9 RSSI=-71 score=1000 time=88 hash=…
+```
+The `RX`/`TX` line itself is unchanged, so readers that match it to the end
+(meshcoretomqtt does) keep working, and a reader that does not know `RADIO:`
+skips the line. One that does applies it to the next `RX`/`TX` line only and
+publishes the same `rx_radio_id`/`tx_radio_id` and `mediamesh` keys as above.
+Compact logging (`R`/`T` hex lines) is unchanged.
+
 ## Key Features
 
 ### Connection Handling
