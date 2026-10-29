@@ -15,15 +15,21 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - Station_G2_repeater_observer_mqtt
-          - Station_G2_room_server_observer_mqtt
-          - Heltec_v3_repeater
+          - ikoka_stick_nrf_30dbm_repeater
     steps:
       - uses: actions/checkout@v4
       - name: Setup Build Environment
         uses: ./.github/actions/setup-build-environment
       - name: Build ${{ matrix.target }}
-        run: /usr/bin/env bash build.sh build-firmware ${{ matrix.target }}
+        run: |
+          set -o pipefail
+          if ! /usr/bin/env bash build.sh build-firmware ${{ matrix.target }} 2>&1 | tee build.log; then
+            # Surface compiler errors as annotations (readable without the log).
+            { grep -n -iE "error|fail|exceed|overflow|budget|too large|region .* overflowed" build.log out/build-logs/*.log 2>/dev/null | grep -v "^.*Compiling" | cut -c1-400 | tail -n 9 || true; } | while IFS= read -r l; do
+              echo "::error::${l//%/%25}"
+            done
+            exit 1
+          fi
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
