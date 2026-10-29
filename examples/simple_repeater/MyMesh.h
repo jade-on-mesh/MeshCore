@@ -164,9 +164,6 @@ struct NeighbourInfo {
   int8_t snr; // multiplied by 4, user should divide to get float value
 #if defined(WITH_MQTT_NEIGHBORS)
   int16_t rssi; // dBm from the last packet heard from this neighbour
-  // Its radio2 (MediaMesh) profile from the last DISCOVER_RESP trailer;
-  // Unknown until it answers one. Published as `radio2` in the neighbors message.
-  Radio2DiscoverTrailer radio2;
 #endif
 };
 
@@ -923,8 +920,19 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks
                                       size_t len, float snr, int16_t rssi);
   void touchNeighbourHeard(const mesh::Identity& id, uint32_t heard_timestamp,
                            float snr, int16_t rssi);
-  // A neighbour's radio2 profile from its DISCOVER_RESP trailer (MediaMesh).
+  // Neighbours' radio2 (MediaMesh) profiles from their DISCOVER_RESP trailers,
+  // published as `radio2` in the neighbors message. A small cache rather than
+  // a field per neighbour: full builds keep up to 254 neighbours and have no
+  // DRAM for that. On reports win over Off ones; a node not here is unknown.
+  struct Radio2CacheEntry {
+    uint8_t prefix[4];
+    Radio2DiscoverTrailer radio2;
+  };
+  static const int RADIO2_CACHE_SIZE = 24;
+  Radio2CacheEntry radio2_cache[RADIO2_CACHE_SIZE];
+  uint8_t radio2_cache_next;
   void noteNeighbourRadio2(const mesh::Identity& id, const Radio2DiscoverTrailer& radio2);
+  Radio2DiscoverTrailer neighbourRadio2(const mesh::Identity& id) const;
   // This node's radio2, for the neighbors message's `self.radio2`; nullptr when off.
   const MQTTRadio2Info* selfRadio2(MQTTRadio2Info& out, char* radio, size_t radio_size);
   void getLocalScopes(char* buf, size_t len);
