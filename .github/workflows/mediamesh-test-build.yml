@@ -23,9 +23,9 @@ jobs:
       - name: Build ${{ matrix.target }}
         run: |
           set -o pipefail
-          if ! /usr/bin/env bash build.sh build-firmware ${{ matrix.target }} 2>&1 | tee build.log; then
+          if ! /usr/bin/env bash build.sh build-firmware ${{ matrix.target }} 2>&1 | tee "$RUNNER_TEMP/build.log"; then
             # Surface compiler errors as annotations (readable without the log).
-            { grep -B 12 -m1 "QUALIFICATION FAILED" build.log | grep -v "Compiling\|Archiving\|Indexing" | cut -c1-300 | tail -n 10 || true; } | while IFS= read -r l; do
+            { grep -B 12 -m1 "QUALIFICATION FAILED" "$RUNNER_TEMP/build.log" | grep -v "Compiling\|Archiving\|Indexing" | cut -c1-300 | tail -n 10 || true; } | while IFS= read -r l; do
               echo "::error::${l//%/%25}"
             done
             exit 1
