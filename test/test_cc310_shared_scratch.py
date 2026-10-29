@@ -72,6 +72,7 @@ HARNESS = r'''
 #include <helpers/NRF52CryptoScratch.h>
 #include <array>
 #include <cstring>
+#include <string>
 #include <thread>
 #include <vector>
 thread_local bool mock_isr=false;
