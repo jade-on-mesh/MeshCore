@@ -1463,6 +1463,14 @@ void MyMesh::logRxRaw(float snr, float rssi, const uint8_t raw[], int len) {
     line.printf("%s RAW: ", getLogDateTime());
     line.hex(raw, len);
     line.flush(mesh::usbLoggingPort());
+    // radio2 (MediaMesh): a line of its own after RAW and before the RX
+    // line, which stays unchanged for meshcoretomqtt (its pattern is anchored
+    // to the end of the line). See MQTT_IMPLEMENTATION.md, "radio2".
+    if (_radio->receiveProfile() == 1) {
+      mesh::SerialLogLine<64> radio_line;
+      radio_line.printf("%s RADIO: radio2", getLogDateTime());
+      radio_line.flush(mesh::usbLoggingPort());
+    }
   }
 #endif
 

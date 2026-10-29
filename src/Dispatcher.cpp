@@ -547,16 +547,6 @@ uint32_t Dispatcher::getCADFailMaxDuration() const {
 void Dispatcher::logPacketLine(const char* direction, const Packet* packet,
                                int len, bool include_rx_metrics, float score,
                                uint32_t air_time) {
-  // radio2 (MediaMesh): a line of its own just before the packet's, so
-  // meshcoretomqtt and other serial-log readers that match the RX/TX line to
-  // its end keep parsing it unchanged, and old ones ignore the extra line.
-  // A reader that knows it tags the next RX/TX line rx_radio_id/tx_radio_id
-  // "radio2" (MQTT_IMPLEMENTATION.md, "radio2 (MediaMesh)").
-  if (packet->radio_profile == 1) {
-    SerialLogLine<64> radio_line;
-    radio_line.printf("%s RADIO: radio2", getLogDateTime());
-    radio_line.flush(usbLoggingPort());
-  }
   SerialLogLine<256> line;
   line.printf("%s: %s, len=%d (type=%d, route=%s, payload_len=%d)",
               getLogDateTime(), direction, len, packet->getPayloadType(),
