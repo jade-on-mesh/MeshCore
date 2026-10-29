@@ -15,6 +15,12 @@ jobs:
       fail-fast: false
       matrix:
         target:
+          - Station_G2_repeater_observer_mqtt
+          - Station_G2_room_server_observer_mqtt
+          - Station_G3_ESP32_repeater_observer_mqtt
+          - Station_G3_ESP32_r2_repeater_observer_mqtt
+          - ikoka_stick_nrf_30dbm_repeater
+          - Heltec_v3_repeater
           - RAK_4631_companion_radio_full
     steps:
       - uses: actions/checkout@v4
