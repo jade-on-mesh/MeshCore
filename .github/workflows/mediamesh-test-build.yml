@@ -30,7 +30,7 @@ jobs:
           set -o pipefail
           if ! /usr/bin/env bash build.sh build-firmware ${{ matrix.target }} 2>&1 | tee build.log; then
             # Surface compiler errors as annotations (readable without the log).
-            { tail -n 40 build.log || true; for f in out/build-logs/*.log; do [ -f "$f" ] || continue; grep -E "error|overflow|Error" "$f" | head -20 || true; tail -n 25 "$f" || true; done; } | while IFS= read -r l; do
+            { grep -n -iE "error|fail|exceed|overflow|budget|too large|region .* overflowed" build.log out/build-logs/*.log 2>/dev/null | grep -v "^.*Compiling" | cut -c1-400 | tail -n 9 || true; } | while IFS= read -r l; do
               echo "::error::${l//%/%25}"
             done
             exit 1
