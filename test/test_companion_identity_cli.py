@@ -20,6 +20,7 @@ HARNESS = r'''
 #include <vector>
 #include <Identity.h>
 #include <helpers/CompanionPowerDiagnostics.h>
+#include <helpers/ConfigCapabilities.h>
 #include "usb_mode_console.h"
 
 // Keep the production diagnostics delegate in the command path. Identity
@@ -35,7 +36,19 @@ struct IdentityBoard {
  bool supportsPowerManagement(){assert(false);return false;}
  uint16_t getBootVoltage(){assert(false);return 0;}
  bool getSystemWatchdogRunning(bool&){assert(false);return false;}
+ bool canControlLoRaFemLna(){assert(false);return false;}
+ bool canControlLoRaFemPaGain(){assert(false);return false;}
+ bool isLoRaFemPaGainEnabled(){assert(false);return false;}
 } board;
+struct IdentityRadio {
+ bool supportsRxPowerSavingRfRxDisable(){assert(false);return false;}
+} radio_driver;
+struct IdentityUi {
+ bool supportsDisplayRotation(){assert(false);return false;}
+};
+struct IdentityProfiles {
+ uint16_t primaryPreamble() const {assert(false);return 0;}
+};
 
 namespace mesh {
 @HEX_CHARS@
@@ -52,6 +65,8 @@ public:
 };
 struct MyMesh {
  mesh::LocalIdentity self_id;
+ IdentityProfiles _radio_profiles;
+ IdentityUi* _ui = nullptr;
  unsigned fallback_calls=0;
  // Routing commands have their own production-method tests. This identity
  // harness exercises fall-through to the shared read-only key query.
