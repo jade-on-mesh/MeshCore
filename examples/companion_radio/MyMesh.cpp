@@ -162,6 +162,8 @@ static bool isCompanionReaderRequest(const char* command) {
 #include <esp_wifi.h>
 #endif
 
+#include <helpers/CLIReplyCopy.h>
+
 static uint32_t nextRadioApplyRetryDelay(uint8_t& failure_count) {
   uint8_t shift = failure_count < 5 ? failure_count : 5;
   if (failure_count < 6) failure_count++;
@@ -4620,7 +4622,7 @@ bool MyMesh::handleLocalControlCommand(const char* command, char* reply,
     if (strcmp(value, "on") != 0 && strcmp(value, "off") != 0) {
       mesh::cli::formatError(reply, reply_size, MESH_CLI_REPLY_TEXT("use set radio.fem.rxgain on|off", "set radio.fem.rxgain on|off"));
     } else if (_radio && (_radio->isMorseTxActive() || _radio->isMorseRxActive())) {
-      mesh::cli::formatError(reply, reply_size, "stop Morse before changing LoRa FEM gain");
+      mesh::cli::formatError(reply, reply_size, MESH_CLI_REPLY_TEXT("stop Morse before changing LoRa FEM gain", "stop Morse before FEM gain"));
     } else if (!board.canControlLoRaFemLna()) {
       mesh::cli::formatError(reply, reply_size, "unsupported");
     } else if (!applyAndSaveFemRxGain(strcmp(value, "on") == 0)) {
@@ -4650,7 +4652,7 @@ bool MyMesh::handleLocalControlCommand(const char* command, char* reply,
     if (strcmp(value, "on") != 0 && strcmp(value, "off") != 0) {
       mesh::cli::formatError(reply, reply_size, MESH_CLI_REPLY_TEXT("use set radio.fem.txgain on|off", "set radio.fem.txgain on|off"));
     } else if (_radio && (_radio->isMorseTxActive() || _radio->isMorseRxActive())) {
-      mesh::cli::formatError(reply, reply_size, "stop Morse before changing LoRa FEM gain");
+      mesh::cli::formatError(reply, reply_size, MESH_CLI_REPLY_TEXT("stop Morse before changing LoRa FEM gain", "stop Morse before FEM gain"));
     } else if (!board.canControlLoRaFemPaGain()) {
       snprintf(reply, reply_size, "%s", board.isLoRaFemPaGainEnabled()
           ? "Error: TX PA is fixed on; use set tx to adjust power"
@@ -5958,11 +5960,11 @@ void MyMesh::execCommand(char* cmd, char* reply) {
     if (!wcParseBool(value, enabled)) {
       mesh::cli::formatError(reply, 160, "must be on or off");
     } else if (_radio && (_radio->isMorseTxActive() || _radio->isMorseRxActive())) {
-      mesh::cli::formatError(reply, 160, "stop Morse before changing LoRa FEM gain");
+      mesh::cli::formatError(reply, 160, MESH_CLI_REPLY_TEXT("stop Morse before changing LoRa FEM gain", "stop Morse before FEM gain"));
     } else if (!board.canControlLoRaFemLna()) {
       mesh::cli::formatError(reply, 160, "unsupported");
     } else if (!applyAndSaveFemRxGain(enabled)) {
-      mesh::cli::formatError(reply, 160, "failed to apply FEM RX gain");
+      mesh::cli::formatError(reply, 160, MESH_CLI_REPLY_TEXT("failed to apply FEM RX gain", "FEM RX gain failed"));
     } else {
       strcpy(reply, "OK");
     }
@@ -5973,11 +5975,11 @@ void MyMesh::execCommand(char* cmd, char* reply) {
     if (!wcParseBool(value, enabled)) {
       mesh::cli::formatError(reply, 160, "must be on or off");
     } else if (_radio && (_radio->isMorseTxActive() || _radio->isMorseRxActive())) {
-      mesh::cli::formatError(reply, 160, "stop Morse before changing LoRa FEM gain");
+      mesh::cli::formatError(reply, 160, MESH_CLI_REPLY_TEXT("stop Morse before changing LoRa FEM gain", "stop Morse before FEM gain"));
     } else if (!board.canControlLoRaFemPaGain()) {
       mesh::cli::formatError(reply, 160, "unsupported");
     } else if (!applyAndSaveFemTxGain(enabled)) {
-      mesh::cli::formatError(reply, 160, "failed to apply FEM TX gain");
+      mesh::cli::formatError(reply, 160, MESH_CLI_REPLY_TEXT("failed to apply FEM TX gain", "FEM TX gain failed"));
     } else {
       strcpy(reply, "OK");
     }
@@ -9912,19 +9914,19 @@ void MyMesh::handleTerminalPath(ContactInfo& recipient,
     case mesh::cli::TerminalPathParseResult::Valid:
       break;
     case mesh::cli::TerminalPathParseResult::Missing:
-      terminalOutput().print("  ERROR: use path <direct|clear|hops separated by spaces or commas>\r\n");
+      terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: use path <direct|clear|hops separated by spaces or commas>\r\n", "  ERROR: path <direct|clear|space/comma-separated hops>\r\n"));
       return;
     case mesh::cli::TerminalPathParseResult::InvalidPrefix:
-      terminalOutput().print("  ERROR: each path hop must be 2, 4, or 6 hex digits\r\n");
+      terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: each path hop must be 2, 4, or 6 hex digits\r\n", "  ERROR: path hops need 2, 4, or 6 hex digits\r\n"));
       return;
     case mesh::cli::TerminalPathParseResult::MixedPrefixSize:
-      terminalOutput().print("  ERROR: all path hops must use the same width\r\n");
+      terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: all path hops must use the same width\r\n", "  ERROR: path hops need equal widths\r\n"));
       return;
     case mesh::cli::TerminalPathParseResult::InvalidSeparator:
-      terminalOutput().print("  ERROR: separate path hops with spaces or commas\r\n");
+      terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: separate path hops with spaces or commas\r\n", "  ERROR: separate hops with spaces/commas\r\n"));
       return;
     case mesh::cli::TerminalPathParseResult::TooManyHops:
-      terminalOutput().print("  ERROR: path must contain at most 63 hops\r\n");
+      terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: path must contain at most 63 hops\r\n", "  ERROR: path max 63 hops\r\n"));
       return;
     case mesh::cli::TerminalPathParseResult::RouteTooLong:
       terminalOutput().print("  ERROR: path is too long\r\n");
@@ -10079,7 +10081,7 @@ void MyMesh::sendTerminalChannelMessage(ChannelDetails& channel,
 #endif
   if (isAliasRadio2Defined()
       && parseCompanionChannelAlias(channel.name).kind == CompanionChannelKind::Meshtext) {
-    terminalOutput().print("  ERROR: Meshtext channel transport is not available\r\n");
+    terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: Meshtext channel transport is not available\r\n", "  ERROR: Meshtext channel unavailable\r\n"));
     return;
   }
   const size_t prefix_len = strlen(_prefs.node_name) + 2;  // "name: "
@@ -10089,7 +10091,7 @@ void MyMesh::sendTerminalChannelMessage(ChannelDetails& channel,
   if (text_len == 0) {
     terminalOutput().print("  ERROR: message is empty\r\n");
   } else if (text_len > max_text_len) {
-    terminalOutput().printf("  ERROR: message must be 1-%u UTF-8 bytes for this node name\r\n",
+    terminalOutput().printf(MESH_CLI_REPLY_TEXT("  ERROR: message must be 1-%u UTF-8 bytes for this node name\r\n", "  ERROR: message 1-%u UTF-8 bytes for node name\r\n"),
                   (unsigned)max_text_len);
   } else if (sendGroupMessage(getRTCClock()->getCurrentTimeUnique(),
                               channel.channel, _prefs.node_name, text,
@@ -10174,7 +10176,7 @@ void MyMesh::sendTerminalLogin(ContactInfo& recipient,
   }
   if (hasPendingReqs()) {
     terminalOutput().print(
-        "  ERROR: another Companion request is still pending\r\n");
+        MESH_CLI_REPLY_TEXT("  ERROR: another Companion request is still pending\r\n", "  ERROR: Companion request pending\r\n"));
     return;
   }
 
@@ -10237,7 +10239,7 @@ void MyMesh::sendTerminalCommand(ContactInfo& recipient,
 
   serviceTerminalCommand();
   if (_terminal_command.isPending()) {
-    terminalOutput().printf("  ERROR: command to %s is still pending\r\n",
+    terminalOutput().printf(MESH_CLI_REPLY_TEXT("  ERROR: command to %s is still pending\r\n", "  ERROR: command to %s pending\r\n"),
                   _terminal_command_target);
     return;
   }
@@ -10255,7 +10257,7 @@ void MyMesh::sendTerminalCommand(ContactInfo& recipient,
   const size_t command_len =
       on_air_command == NULL ? 0 : strlen(on_air_command);
   if (command_len == 0 || command_len > MAX_CORRELATED_CLI_TEXT_LEN) {
-    terminalOutput().printf("  ERROR: remote command must be 1-%u UTF-8 bytes\r\n",
+    terminalOutput().printf(MESH_CLI_REPLY_TEXT("  ERROR: remote command must be 1-%u UTF-8 bytes\r\n", "  ERROR: remote command 1-%u UTF-8 bytes\r\n"),
                   (unsigned)MAX_CORRELATED_CLI_TEXT_LEN);
     return;
   }
@@ -10277,7 +10279,7 @@ void MyMesh::sendTerminalCommand(ContactInfo& recipient,
                                      txt_type, on_air_command,
                                      est_timeout, logical_request_id);
   if (result == MSG_SEND_FAILED) {
-    terminalOutput().print("  ERROR: unable to send remote command\r\n");
+    terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: unable to send remote command\r\n", "  ERROR: remote command send failed\r\n"));
     return;
   }
 
@@ -10329,12 +10331,12 @@ void MyMesh::sendTerminalTraceRoute(const uint8_t* route, uint8_t hash_size,
                                     uint8_t hop_count, const char* target) {
   serviceTerminalTrace();
   if (_terminal_trace_pending) {
-    terminalOutput().printf("  ERROR: trace to %s is still pending\r\n",
+    terminalOutput().printf(MESH_CLI_REPLY_TEXT("  ERROR: trace to %s is still pending\r\n", "  ERROR: trace to %s pending\r\n"),
                   _terminal_trace_target);
     return;
   }
   if (route == NULL || hop_count == 0 || hop_count >= MAX_PATH_SIZE) {
-    terminalOutput().print("  ERROR: trace path must contain 1-63 prefixes\r\n");
+    terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: trace path must contain 1-63 prefixes\r\n", "  ERROR: trace path 1-63 prefixes\r\n"));
     return;
   }
 
@@ -10346,20 +10348,20 @@ void MyMesh::sendTerminalTraceRoute(const uint8_t* route, uint8_t hash_size,
 
   const uint8_t flags = mesh::traceFlagsForHashSize(hash_size);
   if (flags == 0xFF) {
-    terminalOutput().print("  ERROR: trace hash size must be 1, 2, or 4 bytes\r\n");
+    terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: trace hash size must be 1, 2, or 4 bytes\r\n", "  ERROR: trace hashes need 1, 2, or 4 bytes\r\n"));
     return;
   }
 
   mesh::Packet* packet = createTrace(0, 0, flags);
   if (packet == NULL) {
-    terminalOutput().print("  ERROR: unable to allocate trace packet\r\n");
+    terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: unable to allocate trace packet\r\n", "  ERROR: trace allocation failed\r\n"));
     return;
   }
   const uint32_t airtime =
       getTransmitAirtime(packet, 2 + packet->payload_len + route_byte_len);
   if (airtime == 0) {
     releasePacket(packet);
-    terminalOutput().print("  ERROR: unable to estimate trace timeout\r\n");
+    terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: unable to estimate trace timeout\r\n", "  ERROR: trace timeout estimate failed\r\n"));
     return;
   }
   const uint32_t base_timeout =
@@ -10370,7 +10372,7 @@ void MyMesh::sendTerminalTraceRoute(const uint8_t* route, uint8_t hash_size,
       || trace_timeout > 0x7FFFFFFFU
           - mesh::CompanionDelayedReplies::DELIVERY_GRACE_MS) {
     releasePacket(packet);
-    terminalOutput().print("  ERROR: trace timeout is out of range\r\n");
+    terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: trace timeout is out of range\r\n", "  ERROR: trace timeout invalid\r\n"));
     return;
   }
 
@@ -10383,7 +10385,7 @@ void MyMesh::sendTerminalTraceRoute(const uint8_t* route, uint8_t hash_size,
   const uint8_t history = _delayed_replies.reserveTrace(tag, auth, _ms->getMillis());
   if (history == mesh::CompanionDelayedReplies::NO_HISTORY) {
     releasePacket(packet);
-    terminalOutput().print("  ERROR: trace tag is quarantined or reply history is full\r\n");
+    terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: trace tag is quarantined or reply history is full\r\n", "  ERROR: trace quarantined or reply history full\r\n"));
     return;
   }
   if (!sendDirect(packet, route, static_cast<uint8_t>(route_byte_len))) {
@@ -10421,7 +10423,7 @@ void MyMesh::sendTerminalTrace(ContactInfo& recipient) {
           path_bytes, recipient.out_path_len, recipient.id.pub_key,
           include_endpoint, _terminal_tmp_buf, MAX_PACKET_PAYLOAD - 9,
           route)) {
-    terminalOutput().print("  ERROR: recipient has no traceable round-trip path\r\n");
+    terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: recipient has no traceable round-trip path\r\n", "  ERROR: recipient has no trace return path\r\n"));
     return;
   }
   if (route.hop_count >= MAX_PATH_SIZE) {
@@ -10446,14 +10448,14 @@ void MyMesh::sendTerminalRawTrace(const char* arguments) {
       terminalOutput().print("  ERROR: use trace path <1|2|4> <prefixes...>\r\n");
       return;
     case mesh::RawTracePathParseResult::InvalidHashSize:
-      terminalOutput().print("  ERROR: trace hash size must be 1, 2, or 4 bytes\r\n");
+      terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: trace hash size must be 1, 2, or 4 bytes\r\n", "  ERROR: trace hashes need 1, 2, or 4 bytes\r\n"));
       return;
     case mesh::RawTracePathParseResult::InvalidPrefix:
-      terminalOutput().printf("  ERROR: every prefix must be exactly %u hex digits\r\n",
+      terminalOutput().printf(MESH_CLI_REPLY_TEXT("  ERROR: every prefix must be exactly %u hex digits\r\n", "  ERROR: each prefix needs %u hex digits\r\n"),
                     (unsigned)route.hash_size * 2);
       return;
     case mesh::RawTracePathParseResult::TooManyHops:
-      terminalOutput().print("  ERROR: trace path must contain at most 63 prefixes\r\n");
+      terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: trace path must contain at most 63 prefixes\r\n", "  ERROR: trace path max 63 prefixes\r\n"));
       return;
     case mesh::RawTracePathParseResult::RouteTooLong:
       terminalOutput().print("  ERROR: trace path is too long\r\n");
@@ -10482,7 +10484,7 @@ void MyMesh::handleTerminalCommand(char* command, bool reader_prompt,
 #if COMPANION_FEATURE_READER
   if (mesh::morseTimingActive(_radio) && isCompanionReaderRequest(command)) {
     mesh::cancelReaderCommand();
-    terminalOutput().print("  ERROR: Reader unavailable during Morse\r\n");
+    terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: Reader unavailable during Morse\r\n", "  ERROR: Reader blocked by Morse\r\n"));
     return;
   }
   if (mesh::handleReaderCommand(command, terminalOutput(), reader_prompt,
@@ -10598,9 +10600,9 @@ void MyMesh::handleTerminalCommand(char* command, bool reader_prompt,
     ContactInfo* recipient = getTerminalRecipient();
     const char* text = command + 5;
     if (recipient == NULL) {
-      terminalOutput().print("  ERROR: no recipient selected (use 'to' first)\r\n");
+      terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: no recipient selected (use 'to' first)\r\n", "  ERROR: choose recipient with 'to'\r\n"));
     } else if (*text == 0 || strlen(text) > MAX_TEXT_LEN) {
-      terminalOutput().printf("  ERROR: message must be 1-%u characters\r\n", (unsigned)MAX_TEXT_LEN);
+      terminalOutput().printf(MESH_CLI_REPLY_TEXT("  ERROR: message must be 1-%u characters\r\n", "  ERROR: message 1-%u characters\r\n"), (unsigned)MAX_TEXT_LEN);
     } else {
       uint32_t expected_ack = 0;
       uint32_t est_timeout = 0;
@@ -10680,7 +10682,7 @@ void MyMesh::handleTerminalCommand(char* command, bool reader_prompt,
              != mesh::cli::TerminalArgumentCommandMatch::NoMatch) {
     ContactInfo* recipient = getTerminalRecipient();
     if (recipient == NULL) {
-      terminalOutput().print("  ERROR: no recipient selected (use 'to' first)\r\n");
+      terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: no recipient selected (use 'to' first)\r\n", "  ERROR: choose recipient with 'to'\r\n"));
     } else {
       handleTerminalPath(
           *recipient,
@@ -10694,7 +10696,7 @@ void MyMesh::handleTerminalCommand(char* command, bool reader_prompt,
         != mesh::cli::TerminalArgumentCommandMatch::Valid) {
       terminalOutput().print("  ERROR: use login <admin-password>\r\n");
     } else if (recipient == NULL) {
-      terminalOutput().print("  ERROR: no recipient selected (use 'to' first)\r\n");
+      terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: no recipient selected (use 'to' first)\r\n", "  ERROR: choose recipient with 'to'\r\n"));
     } else {
       sendTerminalLogin(*recipient, login_password);
     }
@@ -10705,7 +10707,7 @@ void MyMesh::handleTerminalCommand(char* command, bool reader_prompt,
         != mesh::cli::TerminalArgumentCommandMatch::Valid) {
       terminalOutput().print("  ERROR: use cmd <remote-command>\r\n");
     } else if (recipient == NULL) {
-      terminalOutput().print("  ERROR: no recipient selected (use 'to' first)\r\n");
+      terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: no recipient selected (use 'to' first)\r\n", "  ERROR: choose recipient with 'to'\r\n"));
     } else {
       sendTerminalCommand(*recipient, remote_command);
     }
@@ -10729,7 +10731,7 @@ void MyMesh::handleTerminalCommand(char* command, bool reader_prompt,
     } else {
       recipient = getTerminalRecipient();
       if (recipient == NULL) {
-        terminalOutput().print("  ERROR: no recipient selected (use 'to' first)\r\n");
+        terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: no recipient selected (use 'to' first)\r\n", "  ERROR: choose recipient with 'to'\r\n"));
         return;
       }
     }
@@ -10791,7 +10793,7 @@ void MyMesh::handleTerminalCommand(char* command, bool reader_prompt,
     }
   } else if (strcmp(command, "get radio.fem.rxgain") == 0) {
     if (!board.canControlLoRaFemLna()) {
-      terminalOutput().print("  ERROR: FEM RX gain control is unsupported on this board\r\n");
+      terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: FEM RX gain control is unsupported on this board\r\n", "  ERROR: FEM RX gain unsupported\r\n"));
     } else {
       terminalOutput().printf("  FEM RX gain: %s\r\n",
                     board.isLoRaFemLnaEnabled() ? "on" : "off");
@@ -10801,7 +10803,7 @@ void MyMesh::handleTerminalCommand(char* command, bool reader_prompt,
       if (board.isLoRaFemPaGainEnabled()) {
         terminalOutput().print("  FEM TX gain: on (fixed TX PA)\r\n");
       } else {
-        terminalOutput().print("  ERROR: FEM TX gain control is unsupported on this board\r\n");
+        terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: FEM TX gain control is unsupported on this board\r\n", "  ERROR: FEM TX gain unsupported\r\n"));
       }
     } else {
       terminalOutput().printf("  FEM TX gain: %s\r\n",
@@ -10841,31 +10843,31 @@ void MyMesh::handleTerminalCommand(char* command, bool reader_prompt,
       float parsed = 0.0f;
       if (!mesh::cli::parseDecimalStrict(config + 3, parsed)
           || parsed < 0.0f || parsed > 9.0f) {
-        terminalOutput().print("  ERROR: airtime factor must be 0-9\r\n");
+        terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: airtime factor must be 0-9\r\n", "  ERROR: airtime factor 0-9\r\n"));
       } else {
         terminalOutput().print(savePreference(_prefs.airtime_factor, parsed)
-            ? "  OK\r\n" : "  ERROR: airtime factor could not be saved\r\n");
+            ? "  OK\r\n" : MESH_CLI_REPLY_TEXT("  ERROR: airtime factor could not be saved\r\n", "  ERROR: airtime factor not saved\r\n"));
       }
     } else if (strncmp(config, "name ", 5) == 0 && config[5] != 0) {
       terminalOutput().print(saveAdvertName(config + 5)
-          ? "  OK\r\n" : "  ERROR: name could not be saved\r\n");
+          ? "  OK\r\n" : MESH_CLI_REPLY_TEXT("  ERROR: name could not be saved\r\n", "  ERROR: name not saved\r\n"));
     } else if (strncmp(config, "lat ", 4) == 0) {
       float parsed = 0.0f;
       if (!mesh::cli::parseDecimalStrict(config + 4, parsed)
           || parsed < -90.0f || parsed > 90.0f) {
-        terminalOutput().print("  ERROR: latitude must be -90 to 90\r\n");
+        terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: latitude must be -90 to 90\r\n", "  ERROR: latitude -90 to 90\r\n"));
       } else {
         terminalOutput().print(saveAdvertLocation(parsed, sensors.node_lon)
-            ? "  OK\r\n" : "  ERROR: latitude could not be saved\r\n");
+            ? "  OK\r\n" : MESH_CLI_REPLY_TEXT("  ERROR: latitude could not be saved\r\n", "  ERROR: latitude not saved\r\n"));
       }
     } else if (strncmp(config, "lon ", 4) == 0) {
       float parsed = 0.0f;
       if (!mesh::cli::parseDecimalStrict(config + 4, parsed)
           || parsed < -180.0f || parsed > 180.0f) {
-        terminalOutput().print("  ERROR: longitude must be -180 to 180\r\n");
+        terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: longitude must be -180 to 180\r\n", "  ERROR: longitude -180 to 180\r\n"));
       } else {
         terminalOutput().print(saveAdvertLocation(sensors.node_lat, parsed)
-            ? "  OK\r\n" : "  ERROR: longitude could not be saved\r\n");
+            ? "  OK\r\n" : MESH_CLI_REPLY_TEXT("  ERROR: longitude could not be saved\r\n", "  ERROR: longitude not saved\r\n"));
       }
     } else if (strncmp(config, "tx ", 3) == 0) {
       handleCommand(command, 0, local_reply);
@@ -10881,11 +10883,11 @@ void MyMesh::handleTerminalCommand(char* command, bool reader_prompt,
       if (strcmp(value, "on") != 0 && strcmp(value, "off") != 0) {
         terminalOutput().print("  ERROR: use set radio.fem.rxgain <on|off>\r\n");
       } else if (_radio && (_radio->isMorseTxActive() || _radio->isMorseRxActive())) {
-        terminalOutput().print("  ERROR: stop Morse before changing LoRa FEM gain\r\n");
+        terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: stop Morse before changing LoRa FEM gain\r\n", "  ERROR: stop Morse before FEM gain\r\n"));
       } else if (!board.canControlLoRaFemLna()) {
-        terminalOutput().print("  ERROR: FEM RX gain control is unsupported on this board\r\n");
+        terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: FEM RX gain control is unsupported on this board\r\n", "  ERROR: FEM RX gain unsupported\r\n"));
       } else if (!applyAndSaveFemRxGain(strcmp(value, "on") == 0)) {
-        terminalOutput().print("  ERROR: failed to apply FEM RX gain\r\n");
+        terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: failed to apply FEM RX gain\r\n", "  ERROR: FEM RX gain failed\r\n"));
       } else {
         terminalOutput().printf("  OK - FEM RX gain %s\r\n", value);
       }
@@ -10897,13 +10899,13 @@ void MyMesh::handleTerminalCommand(char* command, bool reader_prompt,
       if (strcmp(value, "on") != 0 && strcmp(value, "off") != 0) {
         terminalOutput().print("  ERROR: use set radio.fem.txgain <on|off>\r\n");
       } else if (_radio && (_radio->isMorseTxActive() || _radio->isMorseRxActive())) {
-        terminalOutput().print("  ERROR: stop Morse before changing LoRa FEM gain\r\n");
+        terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: stop Morse before changing LoRa FEM gain\r\n", "  ERROR: stop Morse before FEM gain\r\n"));
       } else if (!board.canControlLoRaFemPaGain()) {
         terminalOutput().print(board.isLoRaFemPaGainEnabled()
             ? "  ERROR: TX PA is fixed on; use set tx to adjust power\r\n"
-            : "  ERROR: FEM TX gain control is unsupported on this board\r\n");
+            : MESH_CLI_REPLY_TEXT("  ERROR: FEM TX gain control is unsupported on this board\r\n", "  ERROR: FEM TX gain unsupported\r\n"));
       } else if (!applyAndSaveFemTxGain(strcmp(value, "on") == 0)) {
-        terminalOutput().print("  ERROR: failed to apply FEM TX gain\r\n");
+        terminalOutput().print(MESH_CLI_REPLY_TEXT("  ERROR: failed to apply FEM TX gain\r\n", "  ERROR: FEM TX gain failed\r\n"));
       } else {
         terminalOutput().printf("  OK - FEM TX gain %s\r\n", value);
       }
@@ -11201,7 +11203,7 @@ bool MyMesh::handleCommand(const char* command, uint32_t sender_timestamp,
 #if COMPANION_FEATURE_READER
   if (sender_timestamp == 0 && mesh::morseTimingActive(_radio)
       && isCompanionReaderRequest(command)) {
-    mesh::cli::formatError(reply, reply_capacity, "Reader unavailable during Morse");
+    mesh::cli::formatError(reply, reply_capacity, MESH_CLI_REPLY_TEXT("Reader unavailable during Morse", "Reader blocked by Morse"));
     return true;
   }
   if (sender_timestamp == 0
@@ -11607,7 +11609,7 @@ complete_line:
 #if COMPANION_FEATURE_READER
     if (mesh::morseTimingActive(_radio) && isCompanionReaderRequest(cli_command)) {
       mesh::cancelReaderCommand();
-      output.print("  ERROR: Reader unavailable during Morse\r\n");
+      output.print(MESH_CLI_REPLY_TEXT("  ERROR: Reader unavailable during Morse\r\n", "  ERROR: Reader blocked by Morse\r\n"));
     } else if (mesh::handleReaderCommand(cli_command, output)) {
       // USB rescue streams chapters/ranges cooperatively like the terminal.
     } else

@@ -277,18 +277,17 @@ def compile_shared_cli_replies(build_env, node):
     return _compile_shared_reply_copies(build_env, node, "src/helpers/CommonCLI.cpp")
 
 
-def compile_shared_companion_replies(build_env, node):
-    return _compile_shared_reply_copies(build_env, node, "examples/companion_radio/MyMesh.cpp")
-
-
 def companion_shared_replies_policy(platform, mcu, env_name, src_filter,
                                    flags=(), cppdefines=()):
-    if env_name != "RAK_4631_companion_radio_full" or str(mcu).lower() != "nrf52840":
+    if (platform != "nordicnrf52" or env_name != "RAK_4631_companion_radio_full"
+            or str(mcu).lower() != "nrf52840"
+            or not source_selected(src_filter, COMPANION_SOURCES[0])
+            or any(source_selected(src_filter, source) for source in ROLE_SOURCES)):
         return False
     values = flag_defines(flags, cppdefines)
-    return (bool(companion_trim_policy(platform, mcu, src_filter, flags, cppdefines))
-            and ("MESH_CLI_SHARE_REPLIES" not in values
-                 or _enabled(values["MESH_CLI_SHARE_REPLIES"])))
+    return all(name not in values or _enabled(values[name]) for name in (
+        "MESH_NRF52_FLASH_TRIM", "MESH_NRF52_COMPANION_TRIM", "MESH_CLI_SHARE_REPLIES",
+        "MESH_CLI_SHARE_REPLY_COPIES"))
 
 
 def install(build_env):
@@ -325,7 +324,8 @@ def install(build_env):
     if not infrastructure and companion_shared_replies_policy(
             platform.name, mcu, build_env["PIOENV"], build_env.get("SRC_FILTER", ()),
             flags, cppdefines):
-        build_env.AddBuildMiddleware(compile_shared_companion_replies, "*MyMesh.cpp")
+        if "MESH_CLI_SHARE_REPLY_COPIES" not in flag_defines(flags, cppdefines):
+            build_env.AppendUnique(CPPDEFINES=[("MESH_CLI_SHARE_REPLY_COPIES", 1)])
     if infrastructure:
         names = ("local OTA target name only" if definitions.get("OTA_TARGET_NAME_TABLE") == 0
                  or flag_defines(flags, cppdefines).get("OTA_TARGET_NAME_TABLE") == "0"

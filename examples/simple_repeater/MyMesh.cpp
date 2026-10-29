@@ -8319,13 +8319,13 @@ void MyMesh::formatFloodPacketFilters(const char* args, char* reply, bool compac
       field = skipFloodFilterSpaces(field);
       if (!parseFloodFilterUnsigned(slot_text, flood_packet_filter_slots, slot)
           || !slot || !flood_packet_filters[slot - 1].active) {
-        strcpy(reply, "Err - rule slot is empty");
+        strcpy(reply, MESH_CLI_REPLY_TEXT("Err - rule slot is empty", "Err - empty rule slot"));
       } else if (floodFilterAsciiEqual(field, "n") || floodFilterAsciiEqual(field, "sender")) {
         snprintf(reply, 160, "> %s", flood_packet_filters[slot - 1].extra.sender);
       } else if (floodFilterAsciiEqual(field, "x") || floodFilterAsciiEqual(field, "text")) {
         snprintf(reply, 160, "> %s", flood_packet_filters[slot - 1].extra.text);
       } else {
-        strcpy(reply, "Err - field is sender/n or text/x");
+        strcpy(reply, MESH_CLI_REPLY_TEXT("Err - field is sender/n or text/x", "Err - field: sender/n|text/x"));
       }
       return;
     }
@@ -8427,7 +8427,7 @@ void MyMesh::setFloodPacketFilter(const char* args, char* reply,
     if (state != cursor || !strcmp(state, "on") || !strcmp(state, "off")) {
       uint8_t disabled;
       if (!FloodRuleExtensions::enabledValue(state, disabled)) {
-        strcpy(reply, "Err - enabled is on or off"); return;
+        strcpy(reply, MESH_CLI_REPLY_TEXT("Err - enabled is on or off", "Err - enabled: on|off")); return;
       }
       auto& entry = flood_packet_filters[requested_slot];
       if (!entry.active) { strcpy(reply, "Err - empty filter slot"); return; }
@@ -8448,7 +8448,7 @@ void MyMesh::setFloodPacketFilter(const char* args, char* reply,
   }
   char params[256];
   if (strlen(cursor) >= sizeof(params)) {
-    strcpy(reply, "Err - rule parameters too long");
+    strcpy(reply, MESH_CLI_REPLY_TEXT("Err - rule parameters too long", "Err - rule params too long"));
     return;
   }
 
@@ -8523,7 +8523,7 @@ void MyMesh::setFloodPacketFilter(const char* args, char* reply,
       }
       const char* value = strchr(tokens[i], '=') + 1;
       if (!FloodFilterPolicy::parseRuleModes(value, transport_modes)) {
-        strcpy(reply, "Err - mode is radio, bridge, cross, or bridge,cross");
+        strcpy(reply, MESH_CLI_REPLY_TEXT("Err - mode is radio, bridge, cross, or bridge,cross", "Err - mode: radio|bridge|cross|bridge,cross"));
         return;
       }
       mode_set = true;
@@ -8536,7 +8536,7 @@ void MyMesh::setFloodPacketFilter(const char* args, char* reply,
     } else if (floodFilterAsciiStartsWith(tokens[i], "f=")) {
       const char* flags = tokens[i] + 2;
       if (*flags == 0) {
-        strcpy(reply, "Err - compact flags are s, t, and/or r");
+        strcpy(reply, MESH_CLI_REPLY_TEXT("Err - compact flags are s, t, and/or r", "Err - flags: s|t|r (combinable)"));
         return;
       }
       while (*flags != 0) {
@@ -8560,7 +8560,7 @@ void MyMesh::setFloodPacketFilter(const char* args, char* reply,
           }
           retry_on_match = true;
         } else {
-          strcpy(reply, "Err - compact flags are s, t, and/or r");
+          strcpy(reply, MESH_CLI_REPLY_TEXT("Err - compact flags are s, t, and/or r", "Err - flags: s|t|r (combinable)"));
           return;
         }
         flags++;
@@ -8772,7 +8772,7 @@ void MyMesh::setFloodPacketFilter(const char* args, char* reply,
         if (!FloodRuleCLI::copyChannelReference(value, flood_packet_filters,
                 flood_packet_filter_slots, channel_key_len, channel_hash,
                 channel_secret, channel_name, sizeof(channel_name))) {
-          strcpy(reply, "Err - unknown or ambiguous channel key reference; use the original key");
+          strcpy(reply, MESH_CLI_REPLY_TEXT("Err - unknown or ambiguous channel key reference; use the original key", "Err - ambiguous/unknown channel key reference; use original key"));
           return;
         }
       } else if (!floodFilterAsciiEqual(value, "*")) {
@@ -8785,7 +8785,7 @@ void MyMesh::setFloodPacketFilter(const char* args, char* reply,
         if (!parseFloodRuleChannel(
                 value, channel_secret, channel_key_len, hash_prefix,
                 channel_name, sizeof(channel_name))) {
-          strcpy(reply, "Err - channel must be *, public, #channel, hash:XX, or a key");
+          strcpy(reply, MESH_CLI_REPLY_TEXT("Err - channel must be *, public, #channel, hash:XX, or a key", "Err - channel: *|public|#channel|hash:XX|key"));
           return;
         }
         channel_hash = hash_prefix[0];
@@ -8798,7 +8798,7 @@ void MyMesh::setFloodPacketFilter(const char* args, char* reply,
       }
       if (!FloodFilterPolicy::parsePathHashBytes(
               strchr(tokens[i], '=') + 1, hashbytes)) {
-        strcpy(reply, "Err - hashbytes must be any, 1, 2, 2+, or 3");
+        strcpy(reply, MESH_CLI_REPLY_TEXT("Err - hashbytes must be any, 1, 2, 2+, or 3", "Err - hashbytes: any|1|2|2+|3"));
         return;
       }
       hashbytes_set = true;
@@ -8816,7 +8816,7 @@ void MyMesh::setFloodPacketFilter(const char* args, char* reply,
           || floodFilterAsciiStartsWith(tokens[i], "p=");
       if (!FloodRuleExtensions::parsePath(value, path_hash_size, path_hops,
                                     path, extra, legacy_prefix)) {
-        strcpy(reply, "Err - path is [^]ID>...[$], up to four 1/2/3-byte IDs");
+        strcpy(reply, MESH_CLI_REPLY_TEXT("Err - path is [^]ID>...[$], up to four 1/2/3-byte IDs", "Err - path: [^]ID>...[$], max four 1/2/3-byte IDs"));
         return;
       }
       path_set = true;
@@ -8824,7 +8824,7 @@ void MyMesh::setFloodPacketFilter(const char* args, char* reply,
         || floodFilterAsciiStartsWith(tokens[i], "h=")) {
       if (hops_set || !parseFloodFilterHopSpec(
               strchr(tokens[i], '=') + 1, min_hops, max_hops)) {
-        strcpy(reply, "Err - hops must be all, N, N+, or N-M (0-63)");
+        strcpy(reply, MESH_CLI_REPLY_TEXT("Err - hops must be all, N, N+, or N-M (0-63)", "Err - hops: all|N|N+|N-M (0-63)"));
         return;
       }
       hops_set = true;
@@ -8846,33 +8846,33 @@ void MyMesh::setFloodPacketFilter(const char* args, char* reply,
     if (path_hash_size == 0) path_hash_size = hashbytes;
   }
   if (scope_timing_set && !target_set) {
-    strcpy(reply, "Err - tx timing requires scope= or region=");
+    strcpy(reply, MESH_CLI_REPLY_TEXT("Err - tx timing requires scope= or region=", "Err - tx needs scope=|region="));
     return;
   }
   if (drop_on_match && rate_limit_enabled) {
-    strcpy(reply, "Err - drop cannot be combined with rate");
+    strcpy(reply, MESH_CLI_REPLY_TEXT("Err - drop cannot be combined with rate", "Err - drop conflicts with rate"));
     return;
   }
   if (drop_on_match && retry_on_match) {
-    strcpy(reply, "Err - drop cannot be combined with retry");
+    strcpy(reply, MESH_CLI_REPLY_TEXT("Err - drop cannot be combined with retry", "Err - drop conflicts with retry"));
     return;
   }
   if (channel_key_len != 0 && payload_type != FLOOD_PACKET_FILTER_ANY_TYPE
       && payload_type != PAYLOAD_TYPE_GRP_TXT
       && payload_type != PAYLOAD_TYPE_GRP_DATA) {
-    strcpy(reply, "Err - channel matcher requires type=any|grp_txt|grp_data");
+    strcpy(reply, MESH_CLI_REPLY_TEXT("Err - channel matcher requires type=any|grp_txt|grp_data", "Err - channel needs type=any|grp_txt|grp_data"));
     return;
   }
   if (!FloodFilterPolicy::transportActionsSupported(
           transport_modes, target_set, retry_on_match, scope_uses_slow_timing)) {
-    strcpy(reply, "Err - bridge/cross supports drop, rate=, priority=, stop only");
+    strcpy(reply, MESH_CLI_REPLY_TEXT("Err - bridge/cross supports drop, rate=, priority=, stop only", "Err - bridge/cross: drop|rate=|priority=|stop only"));
     return;
   }
   bool action_set = drop_set || target_set || rate_limit_enabled
       || stop_on_match || retry_on_match;
   if (require_explicit_action && !action_set) {
     strcpy(reply,
-           "Err - flood.rule requires drop, scope=, region=, rate=, retry, or stop");
+           MESH_CLI_REPLY_TEXT("Err - flood.rule requires drop, scope=, region=, rate=, retry, or stop", "Err - flood.rule: drop|scope=|region=|rate=|retry|stop"));
     return;
   }
   // Preserve the positional flood.filter behavior. The flood.rule alias is
@@ -8913,7 +8913,7 @@ void MyMesh::setFloodPacketFilter(const char* args, char* reply,
   candidate.transport_modes = transport_modes;
   candidate.extra = extra;
   if (!FloodRuleExtensions::validRuleFields(candidate)) {
-    strcpy(reply, "Err - content needs a keyed group-text channel; scope/retry needs flood route");
+    strcpy(reply, MESH_CLI_REPLY_TEXT("Err - content needs a keyed group-text channel; scope/retry needs flood route", "Err - content needs keyed group-text channel; flood scope/retry only"));
     return;
   }
 
@@ -9884,7 +9884,7 @@ void MyMesh::formatFloodChannelScopes(const char* args, char* reply) {
     return;
   }
   if (*cursor != 0) {
-    strcpy(reply, "Err - use get flood.channel.scope[.n]");
+    strcpy(reply, MESH_CLI_REPLY_TEXT("Err - use get flood.channel.scope[.n]", "Err - get flood.channel.scope[.n]"));
     return;
   }
   if (index >= 0) {
@@ -10132,7 +10132,7 @@ void MyMesh::deleteFloodChannelScope(const char* args, char* reply) {
   int index = -1;
   if (!parseFloodChannelScopeIndex(cursor, index)) index = -1;
   if (index < 0 || *cursor != 0) {
-    strcpy(reply, "Err - use: del flood.channel.scope.<n>|all");
+    strcpy(reply, MESH_CLI_REPLY_TEXT("Err - use: del flood.channel.scope.<n>|all", "Err - del flood.channel.scope.<n>|all"));
     return;
   }
   if (floodChannelScopes()[index].target_id == 0) {
@@ -10180,7 +10180,7 @@ void MyMesh::formatFloodChannelScopeRequirements(const char* args,
     return;
   }
   if (*cursor != 0) {
-    strcpy(reply, "Err - use get flood.channel.scope.require[.n]");
+    strcpy(reply, MESH_CLI_REPLY_TEXT("Err - use get flood.channel.scope.require[.n]", "Err - get flood.channel.scope.require[.n]"));
     return;
   }
   if (index >= 0) {
@@ -10210,7 +10210,7 @@ void MyMesh::setFloodChannelScopeRequirement(const char* args, char* reply) {
   if (takeFloodModerationToken(cursor, channel_text, sizeof(channel_text)) != 1
       || takeFloodModerationToken(cursor, extra, sizeof(extra)) != 0) {
     strcpy(reply,
-           "Err - use: set flood.channel.scope.require[.n] <channel>");
+           MESH_CLI_REPLY_TEXT("Err - use: set flood.channel.scope.require[.n] <channel>", "Err - set flood.channel.scope.require[.n] <channel>"));
     return;
   }
 
@@ -10281,7 +10281,7 @@ void MyMesh::deleteFloodChannelScopeRequirement(const char* args,
   int index = -1;
   if (!parseFloodChannelScopeIndex(cursor, index)) index = -1;
   if (index < 0 || *cursor != 0) {
-    strcpy(reply, "Err - use: del flood.channel.scope.require.<n>|all");
+    strcpy(reply, MESH_CLI_REPLY_TEXT("Err - use: del flood.channel.scope.require.<n>|all", "Err - del flood.channel.scope.require.<n>|all"));
     return;
   }
   if (floodChannelScopeRequirements()[index].key_len == 0) {

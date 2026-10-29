@@ -37,8 +37,9 @@ class CliReplyTextTests(unittest.TestCase):
             self.assertLess(len(new), len(old))
             formats = r'%(?:[-+ #0]*[0-9.*]*[a-zA-Z]+|%)'
             self.assertEqual(re.findall(formats, old), re.findall(formats, new))
-            category = r'^(Error|ERROR|ERR|Err|OK)(?=[: ,\-])'
+            category = r'^[ \t]*(Error|ERROR|ERR|Err|OK)(?=[: ,\-])'
             self.assertEqual(re.findall(category, old), re.findall(category, new))
+            self.assertEqual(re.findall(r'[\r\n]', old), re.findall(r'[\r\n]', new))
             self.assertEqual(re.findall(r'\d+(?:\.\d+)?', old),
                              re.findall(r'\d+(?:\.\d+)?', new))
             self.assertFalse(old.startswith(('> ', '{', 'KEYBACKUP ', 'ACK')))
@@ -105,8 +106,8 @@ class CliReplyTextTests(unittest.TestCase):
                 self.assertEqual(built.returncode, 0, built.stderr.decode(errors='replace'))
                 result = subprocess.run([str(work / 'test')], capture_output=True)
                 self.assertEqual(result.returncode, 0, result.stderr.decode(errors='replace'))
-                self.assertEqual(result.stdout.decode().splitlines(),
-                                 [row[key] for row in messages])
+                self.assertEqual(result.stdout,
+                                 ''.join(row[key] + '\n' for row in messages).encode())
                 if key == 'concise':
                     image = (work / 'test').read_bytes()
                     selected = {row['concise'] for row in messages}
