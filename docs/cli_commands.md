@@ -4683,15 +4683,17 @@ compile this table.
   recent; both require exactly the chain. Commas may replace `>`.
   Each ID must use the packet's complete hash width. Direct paths and TRACE
   SNR bytes never match. `path=blacklist` remains the separate unordered table.
-- `sender=<pattern>` (`n=`), `text=<pattern>` (`x=`): Case-sensitive patterns
-  on the decrypted sender name and message body. Require an explicit
+- `sender=<pattern>` (`n=`), `text=<pattern>` (`x=`): Patterns on the decrypted
+  sender name and message body. Matching is case-sensitive by default; a
+  leading `(?i)` ignores ASCII letter case in literals and character classes.
+  Non-ASCII bytes remain unchanged. Require an explicit
   authenticated channel (`public`, `#name`, or key); `channel=*` and raw hashes
   are insufficient. These match only plain group text. Patterns search
   anywhere unless anchored with `^`/`$`, and support `.`, classes such as
   `[A-Z]` or `[^0-9]`, `*`, `+`, `?`, groups, `|`, and escaped literals.
   Use `[0-9]` for digits and quote values containing spaces. The maximum is
-  63 bytes per pattern. Matching uses complete fields, removes AES zero
-  padding, and shares a 131,072-operation work budget across one rule
+  63 bytes per pattern, including `(?i)`. Matching uses complete fields, removes
+  AES zero padding, and shares a 131,072-operation work budget across one rule
   evaluation. Exhaustion rejects the packet; it cannot grant an allow,
   rewrite, or retry action.
   A message without `:` has no sender field but can match a text rule.
@@ -4954,6 +4956,7 @@ Content, exceptions, and state changes use that same setter:
 
 ```text
 set fr grp_txt c=#local x="^BEACON" d
+set fr grp_txt c=public n="(?i)^(Alice|Bob)$" d
 set fr grp_txt c=#local n="^Alice$" pri=200 a
 set fr grp_txt c=#local d
 set fr.4 e=off
