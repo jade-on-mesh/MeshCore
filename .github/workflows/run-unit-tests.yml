@@ -1072,6 +1072,9 @@ jobs:
           python3 -B test/test_espnow_runtime.py -v
           python3 -B test/test_espnow_bridge_diagnostics.py -v
           python3 -B test/test_espnow_diagnostic_cli.py -v
+          python3 -B test/test_espnow_peer.py -v
+          python3 -B tools/hil/test_split_radio_probe.py -v
+          python3 -B tools/hil/test_split_radio_hardware_test.py -v
           python3 -B test/test_wifi_ota_lifecycle.py -v
 
       - name: Verify message reader buttons, touch targets, and footer layouts
