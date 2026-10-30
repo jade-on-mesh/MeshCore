@@ -1260,6 +1260,23 @@ bool MyMesh::allowTransportPacket(const mesh::Packet* packet, uint8_t context) {
 }
 #endif
 
+#if MESH_PACKET_LOGGING && !MESH_PACKET_LOGGING_COMPACT
+// The frame as sent, ahead of the Dispatcher's TX line, like logRxRaw does for
+// RX: RAW, then the radio2 marker when the packet goes out on radio2. Without
+// the RAW line meshcoretomqtt publishes a TX with the last received frame.
+void mesh::usbLogTxFrame(const char* log_time, const mesh::Packet* packet, const uint8_t raw[], int len) {
+  mesh::SerialLogLine<> line;
+  line.printf("%s RAW: ", log_time);
+  line.hex(raw, len);
+  line.flush(mesh::usbLoggingPort());
+  if (packet->radio_profile == 1) {
+    mesh::SerialLogLine<64> radio_line;
+    radio_line.printf("%s RADIO: radio2", log_time);
+    radio_line.flush(mesh::usbLoggingPort());
+  }
+}
+#endif
+
 void MyMesh::logRxRaw(float snr, float rssi, const uint8_t raw[], int len) {
 #if MESH_PACKET_LOGGING
   if (mesh::isUsbPacketLoggingAllowed()) {

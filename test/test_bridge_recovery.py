@@ -30,8 +30,7 @@ struct esp_now_send_info_t {const uint8_t* des_addr;};
 constexpr int ESP_ERR_ESPNOW_NO_MEM=-77;
 constexpr int ESP_ERR_INVALID_STATE=-78,ESP_ERR_INVALID_ARG=-79;
 constexpr int ESP_ERR_TIMEOUT=-80;
-enum wifi_ps_type_t {WIFI_PS_NONE=0,WIFI_PS_MIN_MODEM=1};
-int esp_wifi_get_ps(wifi_ps_type_t* value){*value=WIFI_PS_NONE;return sdk_initialized?ESP_OK:-1;}
+int esp_wifi_get_ps(wifi_ps_type_t* value){*value=wifi_ps;return sdk_initialized?ESP_OK:-1;}
 int esp_wifi_get_protocol(int,uint8_t* value){*value=15;return sdk_initialized?ESP_OK:-1;}
 int esp_wifi_get_mac(int,uint8_t* value){
  const uint8_t mac[]={2,16,32,48,64,80};memcpy(value,mac,sizeof(mac));return sdk_initialized?ESP_OK:-1;
@@ -40,8 +39,10 @@ uint32_t now_ms=100;
 uint32_t millis(){return now_ms;}
 int send_result=0,send_calls=0;
 std::vector<std::vector<uint8_t>> sent;
-int esp_now_send(const uint8_t*,const uint8_t* bytes,size_t len){
+std::vector<std::array<uint8_t,6>> sent_peers;
+int esp_now_send(const uint8_t* destination,const uint8_t* bytes,size_t len){
  assert(espnow_active);++send_calls;
+ std::array<uint8_t,6> address;memcpy(address.data(),destination,6);sent_peers.push_back(address);
  if(send_result!=ESP_OK)return send_result;
  sent.emplace_back(bytes,bytes+len);return ESP_OK;
 }

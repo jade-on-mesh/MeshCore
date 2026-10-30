@@ -87,11 +87,29 @@ These settings are saved across reboot. Bridge changes apply immediately;
 changing an enabled bridge's channel, format, or secret restarts the bridge.
 Stopping it first lets you finish configuring both sides before connecting them.
 
+For a fixed pair, use acknowledged unicast. Run `get espnow.stats mac` on each
+board, then set each board's destination to the other board's station MAC:
+
+```text
+set espnow.peer AA:BB:CC:DD:EE:FF
+get espnow.peer
+```
+
+Use the actual peer MAC in place of the example. The packet bytes stay
+compatible with older receivers. A failed unicast send is retried up to three
+times; MAC success confirms radio reception, not subsequent LoRa forwarding.
+The setting persists across reboot. `set espnow.peer broadcast` restores the
+default, which lets multiple bridges receive each packet without acknowledgements.
+Dedicated ESP-NOW keeps the WiFi receiver awake to avoid missing bridge packets,
+using more power than modem sleep. When a WiFi service shares the driver, that
+service retains control of its sleep policy.
+
 ## What each bridge option does
 
 | Option | Choices and purpose |
 | --- | --- |
 | `espnow.enabled` | `on` starts ESP-NOW; `off` stops it and keeps its saved settings. Independent of MQTT or RS-232. |
+| `espnow.peer` | `broadcast` by default, or a single destination station MAC for acknowledged unicast. Changing it restarts a running bridge. |
 | `rs232.enabled` | On combined UART images, starts or stops RS-232 independently of MQTT and ESP-NOW. Use `get rs232.running` to check the live UART. |
 | `bridge.channel` | The 2.4 GHz channel, 1-13. Match it on both boards. This is separate from the LoRa frequency in `set radio`. |
 | `bridge.format` | `wrapped` is the default for this two-repeater setup and uses the shared secret. `raw` connects to primary-ESP-NOW nodes such as `Generic_ESPNOW` or `SenseCapIndicator-ESPNow`; it ignores the secret. Both peers must use compatible formats. |

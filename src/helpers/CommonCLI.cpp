@@ -21,6 +21,9 @@
 #include "HilStartupTrace.h"
 #include "FilePresence.h"
 #include "BridgeIngressSettings.h"
+#if defined(WITH_ESPNOW_BRIDGE)
+#include "ESPNowPeerSettings.h"
+#endif
 #include "RadioDirectionSettings.h"
 #if defined(ESP32_PLATFORM)
 #include "BootSlot.h"
@@ -1020,6 +1023,9 @@ static void formatSnrDbX4Short(char* dest, size_t dest_len, int16_t snr_x4) {
 }
 
 void CommonCLI::loadPrefs(FILESYSTEM* fs) {
+#if defined(WITH_ESPNOW_BRIDGE)
+  mesh::bridge::loadEspNowPeerSettings(fs);
+#endif
 #if MESH_ENABLE_RADIO_DIRECTION
   mesh::radioDirection::loadDirectionSettings(fs);
 #endif
@@ -3437,6 +3443,46 @@ bool CommonCLI::handleRs232DiagnosticCommand(uint32_t sender_timestamp,
 #endif
 
 #if defined(WITH_ESPNOW_BRIDGE)
+bool CommonCLI::handleEspNowPeerCommand(const char* command, char* reply) {
+  constexpr size_t capacity = 157;
+  const bool get = !strncmp(command, "get espnow.peer", 15) &&
+      (!command[15] || command[15] == ' ' || command[15] == '\t');
+  const bool set = !strncmp(command, "set espnow.peer", 15) &&
+      (!command[15] || command[15] == ' ' || command[15] == '\t');
+  if (!get && !set) return false;
+  if (get) {
+    if (command[15]) mesh::cli::formatError(reply, capacity, "use get espnow.peer");
+    else mesh::bridge::formatEspNowPeer(reply, capacity);
+    return true;
+  }
+  const char* value = command + 15;
+  while (*value == ' ' || *value == '\t') ++value;
+  uint8_t destination[6], previous[6];
+  if (!mesh::bridge::parseEspNowPeer(value, destination)) {
+    mesh::cli::formatError(reply, capacity, "use set espnow.peer AA:BB:CC:DD:EE:FF|broadcast");
+    return true;
+  }
+  const bool unchanged = mesh::bridge::copyEspNowPeer(previous) &&
+      !memcmp(previous, destination, sizeof(previous));
+  if (!mesh::bridge::saveEspNowPeer(destination)) {
+    if (!mesh::bridge::espNowPeerSettingsHealthy()) _callbacks->setEspNowBridgeState(false);
+    mesh::cli::formatError(reply, capacity, mesh::bridge::espNowPeerSettingsHealthy()
+        ? "ESP-NOW peer not saved" : "ESP-NOW peer not saved; bridge blocked until reload");
+    return true;
+  }
+  const bool enabled =
+#if defined(WITH_MQTT_BRIDGE) || defined(WITH_RS232_BRIDGE)
+      _prefs->espnow_bridge_enabled;
+#else
+      _prefs->bridge_enabled;
+#endif
+  if (!unchanged && enabled && !_callbacks->restartEspNowBridge()) {
+    _callbacks->setEspNowBridgeState(false);
+    mesh::cli::formatError(reply, capacity, "peer saved; ESP-NOW bridge failed to restart");
+  } else snprintf(reply, capacity, unchanged ? "OK - espnow.peer unchanged" : "OK - espnow.peer saved");
+  return true;
+}
+
 bool CommonCLI::handleEspNowDiagnosticCommand(uint32_t sender_timestamp,
                                              const char* command, char* reply) {
   constexpr size_t capacity = 157;  // Leave room for an infrastructure reply prefix.
@@ -3598,6 +3644,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
     if (handleRs232DiagnosticCommand(sender_timestamp, command, reply)) return;
 #endif
 #if defined(WITH_ESPNOW_BRIDGE)
+    if (handleEspNowPeerCommand(command, reply)) return;
     if (handleEspNowDiagnosticCommand(sender_timestamp, command, reply)) return;
 #endif
 #if MESH_ENABLE_FLEET_CONTROL
