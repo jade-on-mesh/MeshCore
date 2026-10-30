@@ -1024,14 +1024,27 @@ own between the packet's `RAW` and `RX` lines:
 12:34:56 - 29/10/2026 U RADIO: radio2
 12:34:56 - 29/10/2026 U: RX, len=64 (type=4, route=F, payload_len=48) SNR=9 RSSI=-71 score=1000 time=88 hash=…
 ```
-The `RAW` and `RX` lines are unchanged, so readers that match them to the end
+For a packet it sends, it prints the frame as sent ahead of the `TX` line, in
+the same order, with the marker when the packet goes out on radio2:
+```
+12:34:57 - 29/10/2026 U RAW: 15A4…
+12:34:57 - 29/10/2026 U RADIO: radio2
+12:34:57 - 29/10/2026 U: TX, len=65 (type=4, route=F, payload_len=48)
+```
+Before this, a `TX` line had no `RAW` of its own, so meshcoretomqtt published
+each transmission with the last frame it had received. Now it publishes the
+frame actually sent, and an observer's own radio2 transmissions show it runs
+MediaMesh.
+
+The `RX` and `TX` lines are unchanged, so readers that match them to the end
 (meshcoretomqtt does) keep working, and a reader that does not know `RADIO:`
-skips the line. One that does applies it to the next `RX` line only (a new
-`RAW` line drops it) and publishes the same `rx_radio_id` and `mediamesh` keys
-as above. Only receptions are marked here, and only by repeaters and room
-servers: the line is printed by their raw-receive hook, so the shared
-dispatcher, Companion builds and compact logging (`R`/`T` hex lines) are
-unchanged.
+skips the line. One that does applies it to the next `RX` or `TX` line only (a
+new `RAW` line drops it) and publishes the same `rx_radio_id`/`tx_radio_id` and
+`mediamesh` keys as above. Only repeaters and room servers print these lines:
+reception from their raw-receive hook, transmission from `mesh::usbLogTxFrame`,
+which the dispatcher calls just before its `TX` line. Other roles leave that
+weak function undefined, so Companion builds pay only a null test, and compact
+logging (`R`/`T` hex lines) is unchanged.
 
 ## Key Features
 
