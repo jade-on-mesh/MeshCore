@@ -15,13 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - Station_G2_repeater_observer_mqtt
-          - Station_G2_room_server_observer_mqtt
-          - Station_G3_ESP32_repeater_observer_mqtt
-          - Station_G3_ESP32_r2_repeater_observer_mqtt
           - ikoka_stick_nrf_30dbm_repeater
-          - Heltec_v3_repeater
-          - RAK_4631_companion_radio_full
     steps:
       - uses: actions/checkout@v4
       - name: Setup Build Environment
@@ -29,13 +23,19 @@ jobs:
       - name: Build ${{ matrix.target }}
         run: |
           set -o pipefail
-          if ! /usr/bin/env bash build.sh build-firmware ${{ matrix.target }} 2>&1 | tee "$RUNNER_TEMP/build.log"; then
+          if ! /usr/bin/env bash build.sh build-firmware ${{ matrix.target }} --firmware-version v1.18.0.1-halo-keymind-cascade-dev-mediamesh --radio-preset usa-cascade-fixed --profile cascade --require-ota 2>&1 | tee "$RUNNER_TEMP/build.log"; then
             # Surface compiler errors as annotations (readable without the log).
             { grep -n -iE "error|fail|exceed|overflow|budget|too large|refus|limit|bytes" "$RUNNER_TEMP/build.log" out/build-logs/*.log 2>/dev/null | grep -v "Compiling" | cut -c1-300 | tail -n 9 || true; } | while IFS= read -r l; do
               echo "::error::${l//%/%25}"
             done
             exit 1
           fi
+      - name: Report package sizes
+        if: always()
+        run: |
+          ls -l out | tail -n +2 | while read -r l; do echo "::notice::$l"; done
+          for z in out/*.zip; do [ -f "$z" ] || continue; unzip -l "$z" | tail -n +4 | head -n -2 | while read -r l; do echo "::notice::$(basename "$z"): $l"; done; done
+          grep -h -iE "application limit|OTA image is|Flash: \[|RAM:   \[" "$RUNNER_TEMP/build.log" | tail -n 6 | while read -r l; do echo "::notice::$l"; done
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
