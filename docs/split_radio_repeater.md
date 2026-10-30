@@ -86,6 +86,7 @@ set bridge.route.1 mac:AA:BB:CC:DD:EE:10 radio2
 set bridge.route.2 mac:AA:BB:CC:DD:EE:20 radio
 set repeat on
 set espnow.enabled on
+get espnow.stats mac
 ```
 
 The first example MAC represents the left V4; the second represents the right.
@@ -95,6 +96,25 @@ than moved to the other channel. Normal duplicate, scope, filter and airtime
 checks still apply. The `mediamesh` preset also enables the normal MediaMesh
 forwarding region. The center's own adverts and replies retain their existing
 routing policies, including `tx.reply`; source rules select forwarded traffic.
+
+Use the center's returned station MAC as the destination on **both receivers**:
+
+```text
+set espnow.peer AA:BB:CC:DD:EE:30
+get espnow.peer
+```
+
+Replace the example with the center's actual MAC. Unicast enables MAC
+acknowledgements and up to three retries after an explicit failed send. The
+packet format is unchanged, so the receiving bridge can run older firmware.
+A MAC acknowledgement confirms reception by the peer radio; check the output
+LoRa network to verify forwarding. The setting persists and restarts an
+already running bridge. `set espnow.peer broadcast` restores the default
+broadcast behavior, which has no receiver acknowledgement.
+
+A dedicated ESP-NOW bridge keeps WiFi modem sleep disabled for prompt packet
+reception. A bridge sharing an active WiFi connection retains that connection's
+power policy and must use its channel.
 
 ## WiFi UDP alternative
 
