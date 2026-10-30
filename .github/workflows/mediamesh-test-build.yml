@@ -41,3 +41,34 @@ jobs:
         with:
           name: ${{ matrix.target }}
           path: out
+
+  # Compile and size checks: the shared dispatcher change must still fit the
+  # RAK4631 Full Companion, and the hook must build for ESP32 repeaters,
+  # room servers and the MQTT observers.
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - RAK_4631_companion_radio_full
+          - Station_G2_repeater_observer_mqtt
+          - Station_G2_room_server_observer_mqtt
+          - Heltec_v3_repeater
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Build Environment
+        uses: ./.github/actions/setup-build-environment
+      - name: Build ${{ matrix.target }}
+        run: |
+          set -o pipefail
+          if ! /usr/bin/env bash build.sh build-firmware ${{ matrix.target }} 2>&1 | tee "$RUNNER_TEMP/build.log"; then
+            { grep -n -iE "error|fail|exceed|overflow|budget|too large|refus|limit|bytes" "$RUNNER_TEMP/build.log" out/build-logs/*.log 2>/dev/null | grep -v "Compiling" | cut -c1-300 | tail -n 9 || true; } | while IFS= read -r l; do
+              echo "::error::${l//%/%25}"
+            done
+            exit 1
+          fi
+      - name: Report sizes
+        if: always()
+        run: |
+          grep -h -iE "application limit|Flash: \[|RAM:   \[|bytes free|remaining" "$RUNNER_TEMP/build.log" | tail -n 6 | while read -r l; do echo "::notice::$l"; done
