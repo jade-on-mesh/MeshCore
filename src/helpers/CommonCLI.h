@@ -1068,6 +1068,7 @@ class CommonCLI {
 #endif
 #if defined(WITH_ESPNOW_BRIDGE)
   bool handleEspNowDiagnosticCommand(uint32_t sender_timestamp, const char* command, char* reply);
+  bool handleEspNowPeerCommand(const char* command, char* reply);
 #endif
 #if defined(WITH_UDP_BRIDGE)
   bool handleUDPBridgeCommand(uint32_t sender_timestamp, const char* command, char* reply);
