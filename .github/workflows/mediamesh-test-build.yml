@@ -15,7 +15,7 @@ jobs:
       matrix:
         target:
           - WioTrackerL1_companion_radio_usb
-          - WioTrackerL1_companion_radio_ble
+          - WioTrackerL1_companion_radio_full
           - RAK_4631_companion_radio_full
           - Heltec_v3_companion_radio_usb
     steps:
