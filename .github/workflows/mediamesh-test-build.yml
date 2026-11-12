@@ -1,0 +1,42 @@
+# Test builds for the companion radio2 RX log marker, on Jade's fork only:
+# never part of the upstream PR. Builds the Wio Tracker L1 USB companion (the
+# RemoteTerm observer it's for) and a few other companions as compile and
+# size checks, and uploads the firmware as artifacts.
+name: MediaMesh MQTT test build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - WioTrackerL1_companion_radio_usb
+          - WioTrackerL1_companion_radio_ble
+          - RAK_4631_companion_radio_full
+          - Heltec_v3_companion_radio_usb
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Build Environment
+        uses: ./.github/actions/setup-build-environment
+      - name: Build ${{ matrix.target }}
+        run: |
+          set -o pipefail
+          if ! /usr/bin/env bash build.sh build-firmware ${{ matrix.target }} 2>&1 | tee "$RUNNER_TEMP/build.log"; then
+            { grep -n -iE "error|fail|exceed|overflow|budget|too large|refus|limit|bytes" "$RUNNER_TEMP/build.log" out/build-logs/*.log 2>/dev/null | grep -v "Compiling" | cut -c1-300 | tail -n 9 || true; } | while IFS= read -r l; do
+              echo "::error::${l//%/%25}"
+            done
+            exit 1
+          fi
+      - name: Report sizes
+        if: always()
+        run: |
+          grep -h -iE "application limit|Flash: \[|RAM:   \[|bytes free|remaining" "$RUNNER_TEMP/build.log" | tail -n 6 | while read -r l; do echo "::notice::$l"; done
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: out
