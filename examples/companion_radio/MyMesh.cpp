@@ -412,7 +412,6 @@ static mesh::Packet* emergency_client_repeat_packet;
 #define PUSH_CODE_CONTACT_DELETED       0x8F // used to notify client app of deleted contact when overwriting oldest
 #define PUSH_CODE_CONTACTS_FULL         0x90 // used to notify client app that contacts storage is full
 #define PUSH_CODE_ONE_KEY_DM_REJECTED    0x91 // full sender key follows
-#define PUSH_CODE_LOG_RX_RADIO           0x92 // [0xA1]: the next LOG_RX_DATA came in on radio2
 
 #define ERR_CODE_UNSUPPORTED_CMD        1
 #define ERR_CODE_NOT_FOUND              2
@@ -880,6 +879,23 @@ const char* MyMesh::getLogDateTime() {
 }
 #endif
 
+#if MESH_PACKET_LOGGING && !MESH_PACKET_LOGGING_COMPACT
+// The frame as sent, ahead of the Dispatcher's TX line, as repeaters log it:
+// RAW, then the radio2 marker when it goes out on radio2. Without the RAW line
+// meshcoretomqtt publishes a TX with the last received frame.
+void mesh::usbLogTxFrame(const char* log_time, const mesh::Packet* packet, const uint8_t raw[], int len) {
+  mesh::SerialLogLine<> line;
+  line.printf("%s RAW: ", log_time);
+  line.hex(raw, len);
+  line.flush(mesh::usbLoggingPort());
+  if (packet->radio_profile == 1) {
+    mesh::SerialLogLine<64> radio_line;
+    radio_line.printf("%s RADIO: radio2", log_time);
+    radio_line.flush(mesh::usbLoggingPort());
+  }
+}
+#endif
+
 void MyMesh::logRxRaw(float snr, float rssi, const uint8_t raw[], int len) {
 #if MESH_ENABLE_RADIO_PROBE_OBSERVER
   _radio_probe.observe(raw,len,rssi,snr,_radio ? _radio->receiveProfile() : 255);
@@ -895,6 +911,14 @@ void MyMesh::logRxRaw(float snr, float rssi, const uint8_t raw[], int len) {
     line.printf("%s RAW: ", getLogDateTime());
     line.hex(raw, len);
     line.flush(mesh::usbLoggingPort());
+    // radio2 (MediaMesh): the repeater's marker line, after RAW and before
+    // the RX line, so a USB logging observer (meshcoretomqtt with radio2
+    // support, on the `usb.logging` port) tags it. See MQTT_IMPLEMENTATION.md.
+    if (_radio && _radio->receiveProfile() == 1) {
+      mesh::SerialLogLine<64> radio_line;
+      radio_line.printf("%s RADIO: radio2", getLogDateTime());
+      radio_line.flush(mesh::usbLoggingPort());
+    }
 #endif
   }
 #endif
@@ -914,16 +938,6 @@ void MyMesh::logRxRaw(float snr, float rssi, const uint8_t raw[], int len) {
             || _radio->receiveProfile() != _ota_direct_radio_profile
             || _radio->receiveProfileGeneration() != _ota_direct_radio_generation)) return;
 #endif
-    // radio2 (MediaMesh): a frame of its own just before the log frame, which
-    // stays unchanged, like the repeater's "RADIO: radio2" USB log line. An
-    // observer app (RemoteTerm, meshcore-packet-capture) tags the next
-    // LOG_RX_DATA with it; others skip an unknown push code. Primary-radio
-    // packets get no marker, so nothing changes while radio2 is off.
-    if (_radio && _radio->receiveProfile() == 1) {
-      out_frame[0] = PUSH_CODE_LOG_RX_RADIO;
-      out_frame[1] = 0xA1;
-      _serial->writeFrame(out_frame, 2);
-    }
     int i = 0;
     out_frame[i++] = PUSH_CODE_LOG_RX_DATA;
     out_frame[i++] = (int8_t)(snr * 4);

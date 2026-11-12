@@ -1054,19 +1054,16 @@ The `RX` and `TX` lines are unchanged, so readers that match them to the end
 (meshcoretomqtt does) keep working, and a reader that does not know `RADIO:`
 skips the line. One that does applies it to the next `RX` or `TX` line only (a
 new `RAW` line drops it) and publishes the same `rx_radio_id`/`tx_radio_id` and
-`mediamesh` keys as above. Only repeaters and room servers print these lines:
-reception from their raw-receive hook, transmission from `mesh::usbLogTxFrame`,
-which the dispatcher calls just before its `TX` line. Other roles leave that
-weak function undefined, so Companion builds pay only a null test, and compact
-logging (`R`/`T` hex lines) is unchanged.
+`mediamesh` keys as above. Repeaters, room servers and companions print these
+lines: reception from their raw-receive hook, transmission from
+`mesh::usbLogTxFrame`, which the dispatcher calls just before its `TX` line.
+Other roles leave that weak function undefined and pay only a null test, and
+compact logging (`R`/`T` hex lines) is unchanged.
 
-**Companion observers (RemoteTerm, meshcore-packet-capture):** a companion's
-`PUSH_CODE_LOG_RX_DATA` (`0x88`) frame has no room for a radio id, so a
-companion with radio2 on sends `PUSH_CODE_LOG_RX_RADIO` (`[0x92][0xA1]`) just
-before the `0x88` frame of each packet it received on radio2. An observer app
-applies it to that next `0x88` frame only and publishes the same
-`rx_radio_id`/`mediamesh` keys as above; apps that don't know the code skip
-it. See `docs/companion_protocol.md`.
+A Full Companion prints them on its USB packet log: on nRF52 the separate
+logging port (`set usb.logging on reboot`, interface `02`), or the shared port
+with `set usb.logging stream reboot`, which is the mode meshcoretomqtt uses
+(it sends `get public.key` and similar commands on the same port).
 
 ## Key Features
 
